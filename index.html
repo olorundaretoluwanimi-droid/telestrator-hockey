@@ -182,7 +182,7 @@ function scoreAt(t) {
   for (const G of TL.goals) { if (t < G.from) break; const done = t >= G.t; st = { umb: done ? G.umb : G.umb - 1, psu: G.psu, lab: done ? G.lab : periodOf(t), g: seg(t, G.t, G.t + .5), flipping: t >= G.t && t < G.t + .5 }; }
   return st;
 }
-function periodOf(t) { const s = segAt(t); const i = TL.seg.indexOf(s); return i <= TL.seg.indexOf(S('g4')) ? '1ST' : '2ND'; }
+function periodOf(t) { return t < S('g4').t1 ? '1ST' : '2ND'; }
 function clockText(s, src) {
   if (!s || !s.clock) return null;
   if (s.clock === 'g1') { const el = Math.max(0, Math.min(src, 10.5) - 0.5), r = Math.ceil(1200 - el - 1e-6); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; }
@@ -284,8 +284,8 @@ function sting(t) {
   X.save(); X.globalAlpha = .3;
   const rr = []; const L = 250, R = 1670, T = 250, B = 900, cr = 170;
   for (let i = 0; i <= 12; i++) { const a = Math.PI + i / 12 * Math.PI / 2; rr.push([L + cr + Math.cos(a) * cr, T + cr + Math.sin(a) * cr]); }
-  const top = [...rr, [R, T]]; const bot = [[R, B]]; for (let i = 0; i <= 12; i++) { const a = Math.PI / 2 + i / 12 * Math.PI / 2; bot.push([L + cr + Math.cos(a) * cr, B - cr + Math.sin(a) * cr]); }
-  marker(wob([...bot.reverse(), ...top], 2, 1), seg(t, .04, .8), COL.chalk, 4);
+  const bot = []; for (let i = 0; i <= 12; i++) { const a = Math.PI - i / 12 * Math.PI / 2; bot.push([L + cr + Math.cos(a) * cr, B - cr + Math.sin(a) * cr]); }
+  marker(wob([[R, T], ...rr.slice().reverse(), ...bot, [R, B]], 2, 1), seg(t, .04, .8), COL.chalk, 4);   // boards: top → corner → left end → corner → bottom
   marker(wob([[L + 120, T + 40], [L + 120, B - 40]], 2, 2), seg(t, .15, .6), COL.chalk, 4);
   for (const cy of [T + 160, B - 160]) { const c = []; for (let i = 0; i <= 30; i++) { const a = i / 30 * Math.PI * 2; c.push([L + 420 + Math.cos(a) * 120, cy + Math.sin(a) * 120]); } marker(c, seg(t, .25, .75), COL.chalk, 4); }
   marker(wob([[R - 160, T], [R - 160, B]], 2, 3), seg(t, .3, .8), COL.def, 6);
@@ -705,7 +705,7 @@ async function endCard(t) {
 async function render(t) {
   const s = segAt(t), lt = t - s.t0;
   X.setTransform(1, 0, 0, 1, 0, 0); X.globalAlpha = 1; X.filter = 'none'; X.textAlign = 'left'; X.letterSpacing = '0px';
-  if (s.id === 'sting') sting(t);
+  if (s.id === 'sting') sting(t - s.t0);
   else if (s.id === 'record') await record(t);
   else if (s.id === 'turn') turn(t);
   else if (s.id === 'data') dataCard(t);
@@ -733,7 +733,7 @@ async function render(t) {
     if (fz) flash(t, s.t0, .1, .55);
   }
   subtitle(t);
-  for (const id of ['record', 'g1live', 'g2live', 'turn', 'g9live', 'g10live', 'g12', 'dlive', 'map', 'data', 'end', 'card']) wipe(t, S(id).t0);
+  for (const id of ['sting', 'record', 'g2live', 'turn', 'g9live', 'g10live', 'g12', 'dlive', 'map', 'data', 'end', 'card']) wipe(t, S(id).t0);
 }
 // Reading-time check (core/render/readcheck.mjs): the information the viewer must read
 window.TEXTS = t => {

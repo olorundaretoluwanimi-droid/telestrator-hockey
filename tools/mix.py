@@ -88,8 +88,8 @@ def hats(a, b, g=.24):
     t = a
     while t < b - .05: ev.append((t, 'drum_kit', 'hi_hat_closed', None, g, .3)); t += B / 2
 
-stab(0.44, 1.0, big=True); ev.append((0.0, 'drum_kit', 'tom_1', None, .5, .2)); ev.append((0.2, 'drum_kit', 'tom_2', None, .6, -.2))
-for k_ in range(6): ev.append((1.1 + k_ * .1, 'drum_kit', 'snare_2', None, .25 + .08 * k_, 0))
+ST = seg['sting']['t0']; stab(ST + .44, 1.0, big=True); ev.append((ST, 'drum_kit', 'tom_1', None, .5, .2)); ev.append((ST + .2, 'drum_kit', 'tom_2', None, .6, -.2))
+for k_ in range(6): ev.append((ST + 1.1 + k_ * .1, 'drum_kit', 'snare_2', None, .25 + .08 * k_, 0))
 R0 = seg['record']['t0']; groove(R0, seg['record']['t1'], .95)
 for i in range(13): ev.append((R0 + .9 + i * .12, 'glockenspiel', ['A6', 'E6'][i % 2], .3, .32, .25))
 for sid, s in seg.items():
@@ -143,9 +143,10 @@ for sid, s in seg.items():
         for d_ in (.12, .45, .8): add(fx, squeak(.32, .45, i), s['t0'] + d_, .5, (i % 3 - 1) * .2); i += 1   # marker lines
         for d_ in (.2, .5): add(fx, pop(1), s['t0'] + d_, .18, .1)                                        # rings
         add(fx, step(1), s['t0'] + 1.05, .25)                                                              # the label lands
-for sid in ['record', 'g1live', 'g2live', 'turn', 'g9live', 'g10live', 'g12', 'dlive', 'map', 'data', 'end', 'card']: add(fx, whoosh(.34, 1), seg[sid]['t0'] - .17, .35)
+for sid in ['sting', 'record', 'g2live', 'turn', 'g9live', 'g10live', 'g12', 'dlive', 'map', 'data', 'end', 'card']: add(fx, whoosh(.34, 1), seg[sid]['t0'] - .17, .35)
 add(fx, whoosh(.9, 1), M0 + .55, .3)
-for d_ in (2.6, 2.9): add(fx, squeak(.35, .4, 90 + int(d_ * 10)), R0 + d_, .5)                             # bracket circles on the record card
+for d_ in (2.6, 2.9): add(fx, squeak(.35, .4, 90 + int(d_ * 10)), R0 + d_, .5)
+add(fx, squeak(.36, .7, 77), ST + .12, .55)   # the sting's marker slash                             # bracket circles on the record card
 add(fx, squeak(.5, .45, 99), T0 + 4.3, .5); add(fx, squeak(.5, .45, 98), D0 + 2.0, .5)
 w = (bp(noise(.6), 300, 2200) * np.sin(np.pi * t_(.6) / .6)).astype(np.float32); add(fx, norm(w), seg['drew']['t0'], .25)
 for sid in ['dslow2', 'dfz3', 'dgo']:                                                                        # stopwatch ticks while the arena clock is shown

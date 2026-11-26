@@ -1,18 +1,18 @@
 1
-00:00:02,600 --> 00:00:08,550
-UMass Boston 8, Plymouth State 5. Two clocks tell this story.
-
-2
-00:00:10,600 --> 00:00:13,249
+00:00:00,500 --> 00:00:03,149
 Puck drops. Start the clock.
 
-3
-00:00:19,550 --> 00:00:22,690
+2
+00:00:09,550 --> 00:00:12,690
 Three Beacons already on the crease.
 
-4
-00:00:23,250 --> 00:00:26,789
+3
+00:00:12,850 --> 00:00:16,389
 Jude Kurtas. Ten seconds in.
+
+4
+00:00:17,800 --> 00:00:23,750
+UMass Boston 8, Plymouth State 5. Two clocks tell this story.
 
 5
 00:00:28,700 --> 00:00:33,021

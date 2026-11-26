@@ -17,11 +17,11 @@ def add(id, d, kind, s0=None, s1=None, **kw):
     global t
     SEG.append(dict(id=id, t0=round(t, 3), t1=round(t + d, 3), kind=kind, s0=s0, s1=s1 if s1 is not None else s0, **kw)); t += d
 # kind: board | live | fz (freeze) | slow | rew | rep (replay play) | split | splitfz | map | end | card
-add('sting', 2.0, 'board')
-add('record', 8.0, 'board', 0.6)
-add('g1live', 9.4, 'live', 0.6, 10.0, clock='g1')
+add('g1live', 9.4, 'live', 0.6, 10.0, clock='g1')      # cold open: the puck drops, the clock runs
 add('g1fz', 2.4, 'fz', 10.0, clock='g1')
 add('g1go', 3.4, 'live', 10.0, 13.4, clock='g1')
+add('sting', 2.0, 'board')
+add('record', 8.0, 'board', 0.6)
 add('g2live', 3.4, 'live', 44.0, 47.4)
 add('g2fz', 2.2, 'fz', 47.4)
 add('g2go', 2.4, 'live', 47.4, 49.8)
@@ -70,11 +70,12 @@ GOALS = [
 # before each flip the PSU score is psu (goals 3–4 come after PSU's 8:51 goal; goal 9 after the 4–4 tie; goal 12 after the 17:35 SH goal)
 
 VO = [  # (id, film time)
-    ('v01', S['record']['t0'] + .6), ('v02', S['g1live']['t0'] + .6), ('v03', S['g1fz']['t0'] + .15), ('v04', GOALS[0]['t'] + 1.0),
+    ('v02', S['g1live']['t0'] + .5), ('v01', S['record']['t0'] + .6), ('v03', S['g1fz']['t0'] + .15), ('v04', GOALS[0]['t'] + .6),
     ('v05', S['g2fz']['t0'] + .1), ('v06', S['g3']['t0'] + .4), ('v07', S['turn']['t0'] + 1.0), ('v08', S['g9fz']['t0'] + .1),
     ('v09', GOALS[5]['t'] + .3), ('v11', S['dlive']['t0'] + .3), ('v12', S['dfz1']['t0'] + .1),
     ('v13', S['dfz2']['t0'] + .1), ('v15', S['dfz3']['t0'] + .3), ('v16', S['dsplit']['t0'] + .5), ('v17', S['map']['t0'] + 1.8),
     ('v18', S['data']['t0'] + .6), ('v19', S['end']['t0'] + 3.9)]
+VO.sort(key=lambda x: x[1])
 vo = [dict(id=i, t=round(tt, 3), text=lines[i]['sub']) for i, tt in VO]
 for a, b in zip(vo, vo[1:]):
     if a['t'] + vdur[a['id']] > b['t'] - .1: print(f"!! {a['id']} ({a['t']:.2f}+{vdur[a['id']]:.2f}) overlaps {b['id']} at {b['t']:.2f}")

@@ -1,23 +1,23 @@
 [
  {
-  "t0": 2.6,
-  "t1": 8.55,
-  "text": "UMass Boston 8, Plymouth State 5. Two clocks tell this story."
- },
- {
-  "t0": 10.6,
-  "t1": 13.249,
+  "t0": 0.5,
+  "t1": 3.149,
   "text": "Puck drops. Start the clock."
  },
  {
-  "t0": 19.55,
-  "t1": 22.69,
+  "t0": 9.55,
+  "t1": 12.69,
   "text": "Three Beacons already on the crease."
  },
  {
-  "t0": 23.25,
-  "t1": 26.789,
+  "t0": 12.85,
+  "t1": 16.389,
   "text": "Jude Kurtas. Ten seconds in."
+ },
+ {
+  "t0": 17.8,
+  "t1": 23.75,
+  "text": "UMass Boston 8, Plymouth State 5. Two clocks tell this story."
  },
  {
   "t0": 28.7,

@@ -50,25 +50,9 @@
  },
  "seg": [
   {
-   "id": "sting",
-   "t0": 0.0,
-   "t1": 2.0,
-   "kind": "board",
-   "s0": null,
-   "s1": null
-  },
-  {
-   "id": "record",
-   "t0": 2.0,
-   "t1": 10.0,
-   "kind": "board",
-   "s0": 0.6,
-   "s1": 0.6
-  },
-  {
    "id": "g1live",
-   "t0": 10.0,
-   "t1": 19.4,
+   "t0": 0.0,
+   "t1": 9.4,
    "kind": "live",
    "s0": 0.6,
    "s1": 10.0,
@@ -76,8 +60,8 @@
   },
   {
    "id": "g1fz",
-   "t0": 19.4,
-   "t1": 21.8,
+   "t0": 9.4,
+   "t1": 11.8,
    "kind": "fz",
    "s0": 10.0,
    "s1": 10.0,
@@ -85,12 +69,28 @@
   },
   {
    "id": "g1go",
-   "t0": 21.8,
-   "t1": 25.2,
+   "t0": 11.8,
+   "t1": 15.2,
    "kind": "live",
    "s0": 10.0,
    "s1": 13.4,
    "clock": "g1"
+  },
+  {
+   "id": "sting",
+   "t0": 15.2,
+   "t1": 17.2,
+   "kind": "board",
+   "s0": null,
+   "s1": null
+  },
+  {
+   "id": "record",
+   "t0": 17.2,
+   "t1": 25.2,
+   "kind": "board",
+   "s0": 0.6,
+   "s1": 0.6
   },
   {
    "id": "g2live",
@@ -340,9 +340,9 @@
   {
    "umb": 1,
    "psu": 0,
-   "t": 22.25,
+   "t": 12.25,
    "lab": "0:10 1ST",
-   "from": 10.0
+   "from": 0.0
   },
   {
    "umb": 2,
@@ -396,24 +396,24 @@
  ],
  "vo": [
   {
-   "id": "v01",
-   "t": 2.6,
-   "text": "UMass Boston 8, Plymouth State 5. Two clocks tell this story."
-  },
-  {
    "id": "v02",
-   "t": 10.6,
+   "t": 0.5,
    "text": "Puck drops. Start the clock."
   },
   {
    "id": "v03",
-   "t": 19.55,
+   "t": 9.55,
    "text": "Three Beacons already on the crease."
   },
   {
    "id": "v04",
-   "t": 23.25,
+   "t": 12.85,
    "text": "Jude Kurtas. Ten seconds in."
+  },
+  {
+   "id": "v01",
+   "t": 17.8,
+   "text": "UMass Boston 8, Plymouth State 5. Two clocks tell this story."
   },
   {
    "id": "v05",
