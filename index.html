@@ -1,0 +1,768 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>THE SLOT — Bookends</title>
+<style>
+@font-face{font-family:Sans;src:url(fonts/sans500.woff2) format('woff2');font-weight:500}
+@font-face{font-family:Sans;src:url(fonts/sans700.woff2) format('woff2');font-weight:700}
+@font-face{font-family:Sans;src:url(fonts/sans900.woff2) format('woff2');font-weight:900}
+@font-face{font-family:Cond;src:url(fonts/cond800i.woff2) format('woff2');font-weight:800;font-style:italic}
+@font-face{font-family:Cond;src:url(fonts/cond600.woff2) format('woff2');font-weight:600}
+@font-face{font-family:Mono;src:url(fonts/mono500.woff2) format('woff2');font-weight:500}
+html,body{margin:0;background:#000;overflow:hidden}
+canvas{display:block}
+</style></head>
+<body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// THE SLOT — "Bookends": UMass Boston 8, Plymouth State 5 (6 Feb 2026), in the Sports Telestrator style.
+// render(t) is deterministic; footage frames (assets/<clip>/NNNN.jpg, 60 fps, 1920×1080) load on demand.
+// Tracking points are in SOURCE pixels (1280×720) at SOURCE seconds; P() scales them to the 1920 frame.
+const C = document.getElementById('c'), X = C.getContext('2d');
+const W = 1920, H = 1080;
+const Q = new URLSearchParams(location.search), DBG = Q.get('dbg') === '1', NOSUB = Q.get('nosub') === '1';
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const eo = k => 1 - Math.pow(1 - clamp(k), 3);
+const eio = k => { k = clamp(k); return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; };
+const back = (k, s = 1.7) => { k = clamp(k) - 1; return k * k * ((s + 1) * k + s) + 1; };
+const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+const COL = { ink: '#FFD400', def: '#3FD8FF', space: '#FF3B30', chalk: '#F4F1E8', board: '#0C1411', card: 'rgba(8,12,14,0.9)', solid: '#080C0E' };
+const F_S = 'Sans', F_C = 'Cond', F_M = 'Mono';
+
+// —— Footage ——
+const cache = new Map();
+function img(src) {
+  if (!cache.has(src)) {
+    if (cache.size > 120) { const k = cache.keys().next().value; cache.delete(k); }
+    cache.set(src, new Promise(res => { const im = new Image(); im.onload = () => im.decode().then(() => res(im), () => res(im)); im.onerror = () => res(null); im.src = src; }));
+  }
+  return cache.get(src);
+}
+let TL, CLIPS = [];
+function clipOf(src) { for (const [id, [a, b]] of CLIPS) if (src >= a - .02 && src <= b + .02) return [id, a, b]; return null; }
+function fsrc(src) {   // source second → frame file (nearest 60 fps frame of the clip that holds it)
+  const c = clipOf(src); if (!c) return null; const [id, a, b] = c; const n = clamp(Math.round((src - a) * 60) + 1, 1, Math.floor((b - a) * 60));
+  return `assets/${id}/${String(n).padStart(4, '0')}.jpg`;
+}
+async function drawSrc(src, o = {}) {
+  // slow motion: neighbour frames cross-blended (no stutter)
+  const f = src * 60, a = Math.floor(f + 1e-6), u = f - a;
+  const A = await img(fsrc(a / 60)), B = u > .02 ? await img(fsrc((a + 1) / 60)) : null;
+  X.save();
+  if (o.zoom && o.zoom !== 1) { const z = o.zoom, cx = o.cx ?? W / 2, cy = o.cy ?? H / 2; X.translate(cx, cy); X.scale(z, z); X.translate(-cx, -cy); }
+  if (o.jx) X.translate(o.jx, 0);
+  if (A) X.drawImage(A, 0, 0, W, H); else { X.fillStyle = '#223'; X.fillRect(0, 0, W, H); }
+  if (B) { X.globalAlpha = u; X.drawImage(B, 0, 0, W, H); X.globalAlpha = 1; }
+  X.restore();
+}
+
+// —— Tracking (source px at source seconds) ——
+const P = (x, y) => [x * 1.5, y * 1.5];
+const TRK = {
+  d25: [[276.6, 290, 535], [277.2, 190, 530], [277.8, 280, 550], [278.4, 330, 640], [279.0, 270, 690]],
+  d17: [[276.6, 745, 450], [277.2, 696, 460], [277.8, 670, 480], [278.4, 636, 490], [279.0, 626, 500], [279.6, 593, 480], [280.2, 601, 428], [280.7, 610, 410], [281.2, 618, 333]],
+  d16: [[279.6, 907, 337], [279.9, 898, 336], [280.3, 900, 335], [280.7, 890, 335], [281.9, 905, 300]],   // #16 Mortson, far circle (one-timer on one knee at 279.9)
+  d3:  [[276.6, 995, 670], [277.2, 980, 660], [277.8, 960, 670], [278.4, 940, 660], [279.0, 1000, 600], [279.6, 967, 527], [280.7, 1110, 470]],
+  dnet: [[276.6, 440, 330], [277.2, 450, 310], [277.8, 440, 310], [278.4, 430, 310], [279.0, 430, 320], [279.6, 400, 350], [280.7, 423, 350], [281.0, 422, 352], [281.4, 400, 352], [282.7, 330, 352]]
+};
+function at(tr, s) {
+  const k = TRK[tr]; if (s <= k[0][0]) return P(k[0][1], k[0][2]);
+  for (let i = 1; i < k.length; i++) if (s <= k[i][0]) { const a = k[i - 1], b = k[i], u = (s - a[0]) / (b[0] - a[0]); return P(lerp(a[1], b[1], u), lerp(a[2], b[2], u)); }
+  const l = k[k.length - 1]; return P(l[1], l[2]);
+}
+
+// —— Timeline ——
+function S(id) { return TL.seg.find(s => s.id === id); }
+function segAt(t) { for (const s of TL.seg) if (t >= s.t0 && t < s.t1) return s; return TL.seg[TL.seg.length - 1]; }
+function srcAt(s, t) {
+  const k = seg(t, s.t0, s.t1);
+  if (s.kind === 'rew') return lerp(s.s0, s.s1, eio(k));
+  return lerp(s.s0, s.s1, k);
+}
+
+// —— Drawing helpers ——
+function wob(pts, amp, seed) { return pts.map((p, i) => { if (i === 0 || i === pts.length - 1) return p; const n = (hash(seed + i * 3.1) - .5) * 2 * amp; return [p[0] + n, p[1] + n * .6]; }); }
+function bez(a, c, b, n = 28) { const o = []; for (let i = 0; i <= n; i++) { const u = i / n; o.push([(1-u)*(1-u)*a[0] + 2*(1-u)*u*c[0] + u*u*b[0], (1-u)*(1-u)*a[1] + 2*(1-u)*u*c[1] + u*u*b[1]]); } return o; }
+function plen(pts) { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]); return L; }
+function partial(pts, k) {
+  const L = plen(pts) * clamp(k); const o = [pts[0]]; let acc = 0;
+  for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]); if (acc + d >= L) { const u = (L - acc) / (d || 1); o.push([lerp(pts[i-1][0], pts[i][0], u), lerp(pts[i-1][1], pts[i][1], u)]); return o; } acc += d; o.push(pts[i]); }
+  return o;
+}
+function path(pts) { X.beginPath(); X.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) X.lineTo(pts[i][0], pts[i][1]); }
+function marker(pts, k, col, w = 9, o = {}) {
+  if (k <= 0) return;
+  const p = partial(pts, k); if (p.length < 2) return;
+  X.save(); X.lineCap = 'round'; X.lineJoin = 'round';
+  if (o.dash) X.setLineDash(o.dash);
+  path(p); X.strokeStyle = 'rgba(0,0,0,0.55)'; X.lineWidth = w + 6; X.stroke();
+  X.shadowColor = col; X.shadowBlur = 18; path(p); X.strokeStyle = col; X.lineWidth = w; X.stroke();
+  X.shadowBlur = 0; path(p); X.strokeStyle = 'rgba(255,255,255,0.55)'; X.lineWidth = Math.max(2, w * .28); X.stroke();
+  X.setLineDash([]);
+  if (o.arrow && k > .9) {
+    const a = p[p.length - 1], b = p[Math.max(0, p.length - 4)]; const ang = Math.atan2(a[1] - b[1], a[0] - b[0]); const s = w * 3.2 * eo(seg(k, .9, 1));
+    X.translate(a[0], a[1]); X.rotate(ang);
+    X.beginPath(); X.moveTo(s * .4, 0); X.lineTo(-s, -s * .62); X.lineTo(-s * .62, 0); X.lineTo(-s, s * .62); X.closePath();
+    X.lineWidth = 6; X.strokeStyle = 'rgba(0,0,0,0.55)'; X.stroke();
+    X.shadowColor = col; X.shadowBlur = 16; X.fillStyle = col; X.fill();
+  }
+  X.restore();
+}
+function ring(x, y, r, col, k = 1, t = 0, o = {}) {
+  if (k <= 0) return;
+  const ry = r * .36;
+  X.save();
+  if (o.beam) {
+    const g = X.createLinearGradient(x, y - r * 3.2, x, y); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, col + '55');
+    X.globalAlpha = k * .9; X.fillStyle = g;
+    X.beginPath(); X.moveTo(x - r * .55, y - r * 3.2); X.lineTo(x + r * .55, y - r * 3.2); X.lineTo(x + r, y); X.lineTo(x - r, y); X.closePath(); X.fill();
+    X.globalAlpha = 1;
+  }
+  X.beginPath(); X.ellipse(x, y, r * eo(k), ry * eo(k), 0, 0, Math.PI * 2); X.fillStyle = col + '30'; X.fill();
+  X.lineWidth = 11; X.strokeStyle = 'rgba(0,0,0,0.5)';
+  X.beginPath(); X.ellipse(x, y, r, ry, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * eo(k)); X.stroke();
+  X.shadowColor = col; X.shadowBlur = 16; X.lineWidth = 6; X.strokeStyle = col; X.stroke(); X.shadowBlur = 0;
+  X.setLineDash([16, 14]); X.lineDashOffset = -t * 60; X.lineWidth = 3; X.globalAlpha = .85 * k;
+  X.beginPath(); X.ellipse(x, y, r * 1.32, ry * 1.32, 0, 0, Math.PI * 2); X.stroke();
+  X.restore();
+}
+function spacePatch(cx, cy, rx, ry, rot, k) {
+  if (k <= 0) return; const sk = eo(k);
+  X.save(); X.globalAlpha = .36 * sk; X.fillStyle = COL.space; X.beginPath(); X.ellipse(cx, cy, rx * sk, ry * sk, rot, 0, Math.PI * 2); X.fill(); X.restore();
+  X.save(); X.globalAlpha = sk; X.setLineDash([14, 10]); X.strokeStyle = COL.space; X.lineWidth = 4; X.beginPath(); X.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2); X.stroke(); X.restore();
+}
+// Label: dark card, coloured left bar, big English line + small spaced tag line in the role colour
+function tag(x, y, big, small, col, k = 1, o = {}) {
+  if (k <= 0) return;
+  const bs = o.size || 40, ss = o.esize || 21;
+  X.save();
+  X.font = `900 ${bs}px ${F_S}`; const wb = X.measureText(big).width;
+  X.font = `600 ${ss}px ${F_C}`; X.letterSpacing = '2px'; const ws = small ? X.measureText(small).width : 0; X.letterSpacing = '0px';
+  const w = Math.max(wb, ws) + 46, h = bs + (small ? ss + 30 : 22);
+  const ax = o.right ? x - w : x, kk = eo(k);
+  X.beginPath(); X.rect(ax, y, w * kk, h); X.clip();
+  X.fillStyle = COL.card; X.fillRect(ax, y, w, h);
+  X.fillStyle = col; X.fillRect(ax, y, 8, h);
+  X.fillStyle = '#fff'; X.font = `900 ${bs}px ${F_S}`; X.textBaseline = 'top'; X.fillText(big, ax + 26, y + 9);
+  if (small) { X.fillStyle = col; X.font = `600 ${ss}px ${F_C}`; X.letterSpacing = '2px'; X.fillText(small, ax + 27, y + 16 + bs); }
+  X.restore();
+}
+function cover(im, sc = 1, fx = .5, fy = .5) { if (!im) return; const s = Math.max(W / im.width, H / im.height) * sc, w = im.width * s, h = im.height * s; X.drawImage(im, (W - w) * fx, (H - h) * fy, w, h); }
+function grade(o = {}) {
+  if (o.freeze) { X.save(); X.globalCompositeOperation = 'saturation'; X.fillStyle = `rgba(128,128,128,${0.42 * o.freeze})`; X.fillRect(0, 0, W, H); X.restore();
+    X.fillStyle = `rgba(10,22,30,${0.16 * o.freeze})`; X.fillRect(0, 0, W, H); }
+  const g = X.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * 1.05);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${0.34 + 0.2 * (o.freeze || 0)})`); X.fillStyle = g; X.fillRect(0, 0, W, H);
+}
+function spot(cx, cy, rx, ry, k) {
+  if (k <= 0) return;
+  X.save(); X.fillStyle = `rgba(0,0,0,${0.42 * k})`; X.beginPath(); X.rect(0, 0, W, H); X.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2, true); X.fill('evenodd'); X.restore();
+}
+function flash(t, t0, d = .12, a = .55) { const k = seg(t, t0, t0 + d); if (k > 0 && k < 1) { X.fillStyle = `rgba(255,255,255,${a * (1 - k)})`; X.fillRect(0, 0, W, H); } }
+function grid(alpha = 1) {
+  X.save(); X.globalAlpha = alpha; X.strokeStyle = 'rgba(244,241,232,0.045)'; X.lineWidth = 1;
+  for (let x = 30; x < W; x += 60) { X.beginPath(); X.moveTo(x + .5, 0); X.lineTo(x + .5, H); X.stroke(); }
+  for (let y = 30; y < H; y += 60) { X.beginPath(); X.moveTo(0, y + .5); X.lineTo(W, y + .5); X.stroke(); }
+  X.restore();
+}
+function boardBg(alpha = 1) {
+  X.fillStyle = COL.board; X.fillRect(0, 0, W, H); grid(alpha);
+  const vg = X.createRadialGradient(760, 520, 200, 760, 520, 1250); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)'); X.fillStyle = vg; X.fillRect(0, 0, W, H);
+}
+function revealText(str, x, y, k) {
+  if (k <= 0) return; const w = X.measureText(str).width; const al = X.textAlign;
+  const x0 = al === 'right' ? x - w : al === 'center' ? x - w / 2 : x;
+  X.save(); X.beginPath(); X.rect(x0 - 4, y - 200, (w + 12) * clamp(k), 260); X.clip(); X.fillText(str, x, y); X.restore();
+}
+
+// —— Packaging: the top strip sits exactly over the broadcaster's score graphic (source x 188–1093, y 56–128; ×1.5, with room for the 1.047 punch) ——
+const STRIP = { x: 240, y: 56, w: 1440, h1: 80, h2: 64 };
+function scoreAt(t) {
+  let st = { umb: 0, psu: 0, lab: '1ST', g: 0 };
+  for (const G of TL.goals) { if (t < G.from) break; const done = t >= G.t; st = { umb: done ? G.umb : G.umb - 1, psu: G.psu, lab: done ? G.lab : periodOf(t), g: seg(t, G.t, G.t + .5), flipping: t >= G.t && t < G.t + .5 }; }
+  return st;
+}
+function periodOf(t) { const s = segAt(t); const i = TL.seg.indexOf(s); return i <= TL.seg.indexOf(S('g4')) ? '1ST' : '2ND'; }
+function clockText(s, src) {
+  if (!s || !s.clock) return null;
+  if (s.clock === 'g1') { const el = Math.max(0, Math.min(src, 10.5) - 0.5), r = Math.ceil(1200 - el - 1e-6); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; }
+  if (s.clock === 'g13') { const v = arena(src); return `0:${v.toFixed(1).padStart(4, '0')}`; }
+  return null;
+}
+function arena(src) { return Math.max(7.7, 13.0 - (src - 276.2)); }   // the arena clock seen in frame: 13.0 at 276.2 s, stops at 07.7 when the goal is given
+function strip(t, mode, s, src, k = 1) {
+  if (k <= 0) return;
+  const { x, y, w, h1, h2 } = STRIP, st = scoreAt(t);
+  X.save(); X.globalAlpha = clamp(k * 2);
+  X.fillStyle = COL.solid; X.fillRect(x, y, w, h1 + h2);
+  // show block
+  X.fillStyle = COL.ink; X.fillRect(x, y, 250, h1);
+  X.fillStyle = '#0B0F14'; X.font = `800 italic 44px ${F_C}`; X.textBaseline = 'middle'; X.letterSpacing = '2px'; X.fillText('THE SLOT', x + 22, y + h1 / 2 + 2);
+  // teams + score
+  const cy = y + h1 / 2 + 2;
+  X.letterSpacing = '2px'; X.font = `800 italic 38px ${F_C}`; X.fillStyle = '#fff';
+  X.fillStyle = COL.def; X.fillRect(x + 280, y + 16, 6, h1 - 32);
+  X.fillStyle = '#fff'; X.fillText('PLYMOUTH ST', x + 300, cy);
+  const flip = st.flipping ? st.g : 1;
+  X.textAlign = 'center'; X.font = `800 italic 52px ${F_C}`;
+  X.fillText(String(st.psu), x + 600, cy + 1); X.fillStyle = 'rgba(255,255,255,0.45)'; X.fillText('–', x + 648, cy + 1);
+  X.save(); X.beginPath(); X.rect(x + 668, y + 6, 64, h1 - 12); X.clip();
+  const shown = st.flipping && flip < .5 ? st.umb - 1 : st.umb, dy = st.flipping ? Math.sin(flip * Math.PI) * -8 : 0;
+  X.fillStyle = COL.ink; X.fillText(String(Math.max(0, shown)), x + 700, cy + 1 + dy); X.restore();
+  X.textAlign = 'left'; X.fillStyle = COL.ink; X.fillRect(x + 752, y + 16, 6, h1 - 32);
+  X.fillStyle = '#fff'; X.font = `800 italic 38px ${F_C}`; X.fillText('UMASS BOSTON', x + 772, cy);
+  X.fillStyle = 'rgba(255,255,255,0.14)'; X.fillRect(x + 1030, y + 14, 2, h1 - 28);
+  const ck = clockText(s, src);
+  X.font = ck ? `500 34px ${F_M}` : `800 italic 36px ${F_C}`; X.letterSpacing = ck ? '0px' : '2px';
+  X.fillStyle = ck ? '#fff' : COL.ink; X.fillText(ck ? ck + '  ' + periodOf(t) : st.lab, x + 1056, cy);
+  if (st.flipping) { X.fillStyle = `rgba(255,212,0,${0.55 * (1 - st.g)})`; X.fillRect(x, y, w, h1); }
+  // row 2: mode + situation
+  const M = { live: ['LIVE', '#FF3B30'], ana: ['ANALYSIS', COL.ink], rep: ['REPLAY', COL.def] }[mode] || ['', '#fff'];
+  X.fillStyle = 'rgba(255,255,255,0.08)'; X.fillRect(x, y + h1, w, 1);
+  if (mode === 'live') { X.beginPath(); X.arc(x + 34, y + h1 + h2 / 2, 8, 0, 7); X.fillStyle = '#FF3B30'; X.fill(); }
+  X.fillStyle = M[1]; X.font = `600 26px ${F_C}`; X.letterSpacing = '5px'; X.fillText(M[0], x + (mode === 'live' ? 54 : 24), y + h1 + h2 / 2 + 1);
+  if (s && s.pp) { X.fillStyle = COL.ink; X.fillRect(x + 560, y + h1 + 14, 6, h2 - 28); X.fillStyle = '#fff'; X.font = `600 26px ${F_C}`; X.fillText('UMASS BOSTON POWER PLAY', x + 580, y + h1 + h2 / 2 + 1); }
+  X.fillStyle = 'rgba(255,255,255,0.55)'; X.font = `600 22px ${F_C}`; X.letterSpacing = '3px'; X.textAlign = 'right';
+  X.fillText('NCAA D-III · 6 FEB 2026', x + w - 24, y + h1 + h2 / 2 + 1); X.textAlign = 'left';
+  X.restore();
+}
+function clockTag(src, mode) {
+  // source timecode of the highlight video, right of the strip (the times and frames everything is counted from)
+  const x = 1696, y = 56;
+  X.save(); X.fillStyle = 'rgba(8,12,14,0.88)'; X.fillRect(x, y, 186, 144);
+  X.fillStyle = mode === 'freeze' ? COL.ink : '#fff'; X.font = `500 26px ${F_M}`; X.textBaseline = 'middle';
+  const icon = mode === 'freeze' ? '❚❚' : mode === 'rew' ? '◀◀' : mode === 'slow' ? '▶ ½' : '▶';
+  X.fillText(icon, x + 18, y + 34);
+  X.fillText(src.toFixed(2) + 's', x + 18, y + 76);
+  X.fillStyle = 'rgba(255,255,255,0.55)'; X.font = `500 20px ${F_M}`; X.fillText('F' + Math.round(src * 60), x + 18, y + 114);
+  X.restore();
+}
+// Subtitles: one English line (the film is in one language: it takes the upper line's place and size), never wrapped
+const SUB = { cx: 960, size: 38, maxW: 1500 };
+function cueSpan(i) { const v = TL.vo[i], d = (TL.vdur && TL.vdur[v.id]) || 2.5, nx = TL.vo[i + 1]; return [v.t, Math.min(v.t + d + .45, nx ? nx.t - .08 : 1e9)]; }
+function subtitle(t) {
+  if (NOSUB) return;
+  TL.vo.forEach((v, i) => {
+    const [t0, t1] = cueSpan(i); const a = seg(t, t0, t0 + .12) * (1 - seg(t, t1 - .18, t1)); if (a <= 0) return;
+    X.save(); X.globalAlpha = a; X.textAlign = 'center'; X.textBaseline = 'middle';
+    X.font = `500 ${SUB.size}px ${F_S}`; const w = X.measureText(v.text).width + 56;
+    if (w > SUB.maxW) console.warn('subtitle too wide:', v.id, Math.round(w));
+    const y0 = 956, h = 72;
+    X.fillStyle = 'rgba(0,0,0,0.64)'; X.fillRect(SUB.cx - w / 2, y0, w, h);
+    X.fillStyle = COL.ink; X.fillRect(SUB.cx - w / 2, y0, 4, h);
+    X.fillStyle = '#fff'; X.fillText(v.text, SUB.cx, y0 + h / 2 + 1);
+    X.restore();
+  });
+}
+function wipe(t, t0, d = .34) {
+  const k = seg(t, t0 - d / 2, t0 + d / 2); if (k <= 0 || k >= 1) return;
+  const x = lerp(-900, W + 900, eio(k));
+  X.save(); X.translate(x, 0); X.transform(1, 0, -0.38, 1, 0, 0);
+  X.fillStyle = COL.ink; X.fillRect(-260, 0, 520, H); X.fillStyle = '#0B0F14'; X.fillRect(-300, 0, 40, H); X.fillRect(260, 0, 18, H);
+  X.restore();
+}
+function stopwatch(x, y, label, val, k, hold) {
+  X.save(); X.globalAlpha = k;
+  X.fillStyle = COL.card; X.fillRect(x, y, 290, 104); X.fillStyle = hold ? COL.ink : COL.chalk; X.fillRect(x, y, 8, 104);
+  X.fillStyle = 'rgba(255,255,255,0.7)'; X.font = `600 21px ${F_C}`; X.letterSpacing = '3px'; X.textBaseline = 'top'; X.fillText(label, x + 26, y + 12);
+  X.letterSpacing = '0px'; X.fillStyle = hold ? COL.ink : '#fff'; X.font = `800 italic 58px ${F_C}`; X.fillText(val, x + 24, y + 38);
+  X.restore();
+}
+function netPulse(t, t0, x, y) { const k = seg(t, t0, t0 + .6); if (k <= 0 || k >= 1) return; X.save(); X.globalAlpha = 1 - k; X.strokeStyle = COL.ink; X.lineWidth = 8; X.beginPath(); X.ellipse(x, y, 40 + 220 * eo(k), 26 + 120 * eo(k), 0, 0, Math.PI * 2); X.stroke(); X.restore(); }
+function rewindFx(t) {
+  X.save();
+  for (let i = 0; i < 4; i++) { const y = (hash(Math.floor(t * 30) + i * 7) * H) | 0; X.fillStyle = 'rgba(255,255,255,0.18)'; X.fillRect(0, y, W, 6 + hash(i + t) * 24); }
+  X.fillStyle = 'rgba(255,255,255,0.92)'; X.font = `800 italic 120px ${F_C}`; X.textBaseline = 'middle'; X.fillText('◀◀', 120, 560);
+  X.font = `900 50px ${F_S}`; X.fillText('RUN IT BACK', 420, 540); X.font = `600 26px ${F_C}`; X.letterSpacing = '4px'; X.fillStyle = COL.ink; X.fillText('REWIND', 422, 594);
+  X.restore();
+}
+
+// —— Board pages ——
+function sting(t) {
+  X.fillStyle = COL.board; X.fillRect(0, 0, W, H); grid(seg(t, 0, .3));
+  // chalk half-rink: boards with rounded corners, goal line, crease, end-zone circles (0.04–0.8)
+  X.save(); X.globalAlpha = .3;
+  const rr = []; const L = 250, R = 1670, T = 250, B = 900, cr = 170;
+  for (let i = 0; i <= 12; i++) { const a = Math.PI + i / 12 * Math.PI / 2; rr.push([L + cr + Math.cos(a) * cr, T + cr + Math.sin(a) * cr]); }
+  const top = [...rr, [R, T]]; const bot = [[R, B]]; for (let i = 0; i <= 12; i++) { const a = Math.PI / 2 + i / 12 * Math.PI / 2; bot.push([L + cr + Math.cos(a) * cr, B - cr + Math.sin(a) * cr]); }
+  marker(wob([...bot.reverse(), ...top], 2, 1), seg(t, .04, .8), COL.chalk, 4);
+  marker(wob([[L + 120, T + 40], [L + 120, B - 40]], 2, 2), seg(t, .15, .6), COL.chalk, 4);
+  for (const cy of [T + 160, B - 160]) { const c = []; for (let i = 0; i <= 30; i++) { const a = i / 30 * Math.PI * 2; c.push([L + 420 + Math.cos(a) * 120, cy + Math.sin(a) * 120]); } marker(c, seg(t, .25, .75), COL.chalk, 4); }
+  marker(wob([[R - 160, T], [R - 160, B]], 2, 3), seg(t, .3, .8), COL.def, 6);
+  X.restore();
+  marker(wob(bez([170, 880], [900, 760], [1760, 820]), 4, 9), eo(seg(t, .12, .48)), COL.ink, 26, { arrow: true });
+  const s = seg(t, .42, .62);
+  if (s > 0) { X.save(); X.translate(W / 2, 470); const sc = lerp(1.6, 1, back(s, 2.2)); X.scale(sc, sc); X.globalAlpha = clamp(s * 3);
+    X.fillStyle = '#fff'; X.font = `800 italic 250px ${F_C}`; X.textAlign = 'center'; X.textBaseline = 'middle'; X.letterSpacing = '6px'; X.fillText('THE SLOT', 0, 0); X.restore(); }
+  const s2 = seg(t, .62, .86);
+  if (s2 > 0) { X.save(); X.globalAlpha = s2; X.textAlign = 'center'; X.fillStyle = COL.ink; X.font = `800 italic 46px ${F_C}`; X.letterSpacing = '14px'; X.fillText('HOCKEY BREAKDOWN', W / 2 + 7, 650);
+    X.letterSpacing = '2px'; X.fillStyle = '#fff'; X.font = `500 34px ${F_S}`; X.fillText('How the goals went in', W / 2, 716); X.restore(); }
+  flash(t, .44, .1, .5);
+}
+let BG0 = null;
+async function record(t) {
+  const s = S('record'), T0 = s.t0, k = seg(t, s.t0, s.t1);
+  X.fillStyle = '#000'; X.fillRect(0, 0, W, H);
+  if (!BG0) BG0 = await img(fsrc(0.6));
+  X.save(); X.filter = 'saturate(0.6) brightness(0.5)'; cover(BG0, lerp(1.06, 1.12, k), .5, .62); X.restore();
+  const g = X.createLinearGradient(0, 0, W, 0); g.addColorStop(0, 'rgba(6,10,12,0.94)'); g.addColorStop(.7, 'rgba(6,10,12,0.7)'); g.addColorStop(1, 'rgba(6,10,12,0.35)'); X.fillStyle = g; X.fillRect(0, 0, W, H);
+  { const g2 = X.createLinearGradient(0, 0, 0, 300); g2.addColorStop(0, 'rgba(6,10,12,1)'); g2.addColorStop(.75, 'rgba(6,10,12,1)'); g2.addColorStop(1, 'rgba(6,10,12,0)'); X.fillStyle = g2; X.fillRect(0, 0, W, 300); }   // the broadcaster's score graphic stays hidden
+  const a1 = eo(seg(t, T0 + .05, T0 + .35));
+  X.save(); X.globalAlpha = a1; X.translate(lerp(-40, 0, a1), 0);
+  X.fillStyle = COL.ink; X.fillRect(120, 150, 10, 74);
+  X.fillStyle = '#fff'; X.font = `900 54px ${F_S}`; X.textBaseline = 'top'; X.fillText('MATCH RECORD', 152, 150);
+  X.fillStyle = COL.ink; X.font = `600 24px ${F_C}`; X.letterSpacing = '5px'; X.fillText('NCAA DIVISION III MEN · LITTLE EAST CONFERENCE', 152, 214);
+  X.restore();
+  const a2 = eo(seg(t, T0 + .2, T0 + .5));
+  X.save(); X.globalAlpha = a2; X.fillStyle = 'rgba(255,255,255,0.86)'; X.font = `500 30px ${F_S}`; X.textBaseline = 'top';
+  X.fillText('Friday 6 February 2026 · Edward T. Barry Ice Rink, Boston', 122, 272); X.restore();
+  // score: PSU 5 – UMB n, UMB digit counts up as its dots land
+  const a3 = eo(seg(t, T0 + .3, T0 + .6));
+  const D = REC_DOTS(T0);
+  const umb = D.filter(d => d.team === 'u' && t >= d.tt).length, psu = D.filter(d => d.team === 'p' && t >= d.tt).length;
+  X.save(); X.globalAlpha = a3; X.textBaseline = 'alphabetic';
+  X.fillStyle = '#fff'; X.font = `900 52px ${F_S}`; X.fillText('PLYMOUTH STATE', 122, 452);
+  X.font = `800 italic 170px ${F_C}`; X.fillStyle = COL.def; X.fillText(String(psu), 600, 500);
+  X.fillStyle = 'rgba(255,255,255,0.5)'; X.fillText('–', 700, 500);
+  const pop = D.filter(d => d.team === 'u').reduce((m, d) => Math.max(m, t >= d.tt ? 1 - seg(t, d.tt, d.tt + .22) : 0), 0);
+  X.save(); X.translate(800, 500); X.scale(1 + .16 * pop, 1 + .16 * pop); X.fillStyle = COL.ink; X.fillText(String(umb), 0, 0); X.restore();
+  X.fillStyle = '#fff'; X.font = `900 52px ${F_S}`; X.fillText('UMASS BOSTON', 930, 452);
+  X.restore();
+  // 60-minute axis, three periods
+  const x0 = 122, x1 = 1500, y = 610, a4 = eo(seg(t, T0 + .45, T0 + .8)), MX = m => x0 + (x1 - x0) * m / 60;
+  X.save(); X.globalAlpha = a4;
+  X.fillStyle = 'rgba(255,255,255,0.25)'; X.fillRect(x0, y - 2, (x1 - x0) * a4, 4);
+  X.font = `600 24px ${F_C}`; X.letterSpacing = '3px'; X.textAlign = 'center'; X.fillStyle = 'rgba(255,255,255,0.6)';
+  for (const [m, lab] of [[0, '0:00'], [20, '1ST | 2ND'], [40, '2ND | 3RD'], [60, '60:00']]) { X.fillRect(MX(m) - 1, y - 16, 2, 32); X.fillText(lab, MX(m), y + 56); }
+  X.fillStyle = 'rgba(255,255,255,0.4)'; X.fillText('NO GOALS IN THE 3RD', MX(50), y - 30);
+  for (const d of D) {
+    const kk = eo(seg(t, d.tt, d.tt + .18)); if (kk <= 0) continue; const xx = MX(d.m), yy = d.team === 'u' ? y - 22 : y + 22;
+    X.fillStyle = d.team === 'u' ? COL.ink : COL.def; X.beginPath(); X.arc(xx, yy, 11 * kk, 0, 7); X.fill();
+  }
+  X.restore();
+  // bookends: marker circles on the first and last UMass Boston goals
+  const circ = (cx, cy, r, sd) => { const c = []; for (let i = 0; i <= 36; i++) { const u = i / 36 * Math.PI * 2.1 - 2.2; c.push([cx + Math.cos(u) * r, cy + Math.sin(u) * r * .8]); } return wob(c, 2, sd); };
+  marker(circ(MX(10 / 60), y - 22, 36, 5), seg(t, T0 + 2.6, T0 + 2.95), COL.space, 6);
+  marker(circ(MX(39 + 52.3 / 60), y - 22, 36, 7), seg(t, T0 + 2.9, T0 + 3.25), COL.space, 6);
+  tag(MX(0) - 4, y + 96, '0:10', 'FIRST GOAL', COL.ink, seg(t, T0 + 2.75, T0 + 3.0), { size: 40, esize: 18 });
+  tag(MX(39.87) - 120, y + 96, '39:52', '7.7 SECONDS LEFT IN THE 2ND', COL.ink, seg(t, T0 + 3.05, T0 + 3.3), { size: 40, esize: 18 });
+  X.save(); X.globalAlpha = a2 * .7; X.fillStyle = '#fff'; X.font = `500 20px ${F_S}`; X.fillText('Source: Plymouth State Athletics box score', 122, 860); X.restore();
+}
+function REC_DOTS(T0) {   // goal minutes (game time) from the box score; dots land one by one
+  const u = [0 + 10 / 60, 8 + 7 / 60, 13 + 22 / 60, 16 + 33 / 60, 27 + 51 / 60, 33 + 32 / 60, 38 + 24 / 60, 39 + 52.3 / 60];
+  const p = [8 + 51 / 60, 18 + 44 / 60, 25 + 36 / 60, 25 + 51 / 60, 37 + 35 / 60];
+  return [...u.map(m => ({ m, team: 'u' })), ...p.map(m => ({ m, team: 'p' }))].sort((a, b) => a.m - b.m).map((d, i) => ({ ...d, tt: T0 + .9 + i * .12 }));
+}
+function turn(t) {
+  const s = S('turn'), T0 = s.t0;
+  boardBg(1);
+  const z = lerp(1.0, 1.03, seg(t, s.t0, s.t1)); X.save(); X.translate(W / 2, H / 2); X.scale(z, z); X.translate(-W / 2, -H / 2);
+  const L = 150;
+  X.globalAlpha = eo(seg(t, T0 + .02, T0 + .3)); X.fillStyle = COL.def; X.fillRect(L, 118, 10, 140); X.globalAlpha = 1;
+  X.textBaseline = 'alphabetic'; X.fillStyle = '#fff'; X.font = `900 64px ${F_S}`; revealText('THEN IT TURNED', L + 34, 178, seg(t, T0 + .02, T0 + .3));
+  X.fillStyle = 'rgba(63,216,255,0.9)'; X.font = `600 22px ${F_C}`; X.letterSpacing = '5px'; revealText('PLYMOUTH STATE · NOT IN THE HIGHLIGHT VIDEO · FROM THE BOX SCORE', L + 36, 236, seg(t, T0 + .2, T0 + .5)); X.letterSpacing = '0px';
+  // score: 4–1 → 4–2 → 4–3 → 4–4
+  const rows = [
+    { time: '18:44', per: '1ST', who: "#28 Patrick O'Connell", tt: T0 + 1.2 },
+    { time: '5:36', per: '2ND', who: '#17 Will Pray', tt: T0 + 2.4 },
+    { time: '5:51', per: '2ND', who: '#14 Brendan Doyle', tt: T0 + 3.2 }];
+  const psu = 1 + rows.filter(r => t >= r.tt + .3).length;
+  const pop = rows.reduce((m, r) => Math.max(m, t >= r.tt + .3 ? 1 - seg(t, r.tt + .3, r.tt + .55) : 0), 0);
+  X.save(); X.globalAlpha = eo(seg(t, T0 + .3, T0 + .6)); X.textAlign = 'right';
+  X.font = `800 italic 220px ${F_C}`; X.fillStyle = COL.ink; X.fillText('4', 1590, 560); X.fillStyle = 'rgba(255,255,255,0.45)'; X.fillText('–', 1655, 560);
+  X.save(); X.translate(1790, 560); X.scale(1 + .2 * pop, 1 + .2 * pop); X.fillStyle = COL.def; X.fillText(String(psu), 0, 0); X.restore();
+  X.textAlign = 'left'; X.font = `600 26px ${F_C}`; X.letterSpacing = '4px'; X.fillStyle = 'rgba(255,255,255,0.7)'; X.fillText('UMASS BOSTON  –  PLYMOUTH STATE', 1290, 620);
+  X.restore();
+  const Y0 = 400, DY = 150;
+  rows.forEach((r, i) => {
+    const y = Y0 + i * DY, k = seg(t, r.tt, r.tt + .3);
+    if (i > 0) { X.fillStyle = 'rgba(244,241,232,0.12)'; X.fillRect(L, y - 104, 880 * eo(k), 1); }
+    X.fillStyle = COL.def; X.font = `800 italic 96px ${F_C}`; revealText(r.time, L, y, k);
+    X.fillStyle = 'rgba(244,241,232,0.7)'; X.font = `600 30px ${F_C}`; X.letterSpacing = '3px'; revealText(r.per, L + 250, y - 40, seg(t, r.tt + .1, r.tt + .35)); X.letterSpacing = '0px';
+    X.fillStyle = '#fff'; X.font = `700 40px ${F_S}`; revealText(r.who, L + 330, y - 22, seg(t, r.tt + .15, r.tt + .45));
+  });
+  // red circle: 15 seconds between 5:36 and 5:51
+  const cy = Y0 + 1.5 * DY - 30, circ = []; for (let i = 0; i <= 40; i++) { const u = i / 40 * Math.PI * 2.1 - 2.4; circ.push([L + 120 + Math.cos(u) * 200, cy + Math.sin(u) * 150]); }
+  marker(wob(circ, 3, 21), seg(t, T0 + 4.3, T0 + 4.8), COL.space, 7);
+  tag(L + 340, cy + 140, '15 SECONDS APART', 'TIED 4–4 AT 5:51 OF THE 2ND', COL.space, seg(t, T0 + 4.7, T0 + 5.0), { size: 38, esize: 19 });
+  X.restore();
+}
+function dataCard(t) {
+  const s = S('data'), T0 = s.t0;
+  boardBg(1);
+  const z = lerp(1.0, 1.03, seg(t, s.t0, s.t1)); X.save(); X.translate(W / 2, H / 2); X.scale(z, z); X.translate(-W / 2, -H / 2);
+  const L = 150, NX = 760;
+  X.globalAlpha = eo(seg(t, T0 + .02, T0 + .3)); X.fillStyle = COL.ink; X.fillRect(L, 118, 10, 140); X.globalAlpha = 1;
+  X.textBaseline = 'alphabetic'; X.fillStyle = '#fff'; X.font = `900 64px ${F_S}`; revealText('THE NUMBERS', L + 34, 178, seg(t, T0 + .02, T0 + .3));
+  X.fillStyle = 'rgba(255,212,0,0.85)'; X.font = `600 22px ${F_C}`; X.letterSpacing = '5px'; revealText('COUNTED ON THE GAME CLOCK · BOX SCORE', L + 36, 236, seg(t, T0 + .2, T0 + .45)); X.letterSpacing = '0px';
+  const rows = [
+    { lab: 'First goal', note: 'into the game · Kurtas', num: '0:10', unit: '', tt: T0 + .3 },
+    { lab: 'Last goal', note: 'left in the 2nd · Mortson', num: '7.7', unit: 's', tt: T0 + .6 },
+    { lab: 'Goals / shots', note: 'UMass Boston on goal', num: '8 / 38', unit: '', tt: T0 + .9 },
+    { lab: 'Saves', note: 'Connor McDonough, 60 minutes', num: '41', unit: '', tt: T0 + 1.2 }];
+  const Y0 = 380, DY = 135; let box = null;
+  rows.forEach((r, i) => {
+    const y = Y0 + i * DY, tt = r.tt;
+    if (i > 0) { X.fillStyle = 'rgba(244,241,232,0.12)'; X.fillRect(L, y - 104, 1150 * eo(seg(t, tt - .1, tt + .25)), 1); }
+    X.fillStyle = '#fff'; X.font = `700 44px ${F_S}`; revealText(r.lab, L, y - 34, seg(t, tt, tt + .3));
+    X.fillStyle = 'rgba(244,241,232,0.55)'; X.font = `500 26px ${F_S}`; revealText(r.note, L, y + 8, seg(t, tt + .3, tt + .55));
+    X.font = `800 italic 120px ${F_C}`; const nw = X.measureText(r.num).width;
+    X.fillStyle = COL.ink; revealText(r.num, NX, y + 6, seg(t, tt + .2, tt + .5));
+    if (r.unit) { X.fillStyle = '#fff'; X.font = `600 56px ${F_C}`; revealText(r.unit, NX + nw + 14, y + 4, seg(t, tt + .35, tt + .55)); }
+    if (i === 1) box = { x: NX, w: nw + 60, y };
+  });
+  if (box) { const cx = box.x + box.w / 2, cy = box.y - 40, c = []; for (let i = 0; i <= 40; i++) { const u = i / 40 * Math.PI * 2.1 - 2.4; c.push([cx + Math.cos(u) * (box.w / 2 + 50), cy + Math.sin(u) * 82]); } marker(wob(c, 3, 23), seg(t, T0 + 2.0, T0 + 2.4), COL.space, 7); }
+  X.fillStyle = `rgba(244,241,232,${0.45 * eo(seg(t, T0 + 1.7, T0 + 1.9))})`; X.fillRect(L, 872, 4, 28);
+  X.fillStyle = 'rgba(244,241,232,0.62)'; X.font = `500 24px ${F_S}`; revealText('Times read off the broadcast and arena clocks; shots and saves from the official box score.', L + 20, 896, seg(t, T0 + 1.7, T0 + 2.1));
+  X.restore();
+}
+
+// —— Freeze overlays (each draws in 1920 frame coordinates, under the same punch transform as the picture) ——
+function overlay(s, t, src) {
+  const id = s.id, lt = t - s.t0;
+  if (id === 'g1fz') {
+    spot(...P(960, 272), 380, 170, eo(seg(lt, 0, .3)));
+    const W3 = [P(846, 274), P(896, 268), P(1111, 287)];
+    W3.forEach((p, i) => ring(p[0], p[1], 34, COL.ink, seg(lt, .1 + i * .12, .4 + i * .12), t, { beam: i < 2 }));
+    marker(wob([W3[0], W3[1], P(1000, 284), W3[2]].map(p => [p[0], p[1] + 4]), 2, 11), eo(seg(lt, .5, .95)), COL.ink, 6, { dash: [18, 12] });
+    tag(760, 560, 'THREE ON THE CREASE', '10 SECONDS INTO THE GAME', COL.ink, seg(lt, .8, 1.1));
+    tag(...[P(1111, 287)[0] - 40, P(1111, 287)[1] + 40], '#17', 'KRIVTSOV', COL.ink, seg(lt, .6, .85), { size: 30, esize: 17 });
+  }
+  if (id === 'g1go') {
+    const G = TL.goals[0]; netPulse(t, G.t, ...P(995, 262));
+  }
+  if (id === 'g2fz') {
+    const k17 = P(1065, 501), d = P(988, 393), net = P(1160, 350);
+    spot(1560, 640, 520, 300, eo(seg(lt, 0, .3)));
+    ring(k17[0], k17[1], 38, COL.ink, seg(lt, .1, .4), t, { beam: true });
+    ring(d[0], d[1], 32, COL.def, seg(lt, .3, .55), t);
+    marker(wob(bez([k17[0] + 20, k17[1] - 10], [k17[0] + 150, k17[1] - 160], [net[0] + 20, net[1] + 30]), 2, 13), eo(seg(lt, .4, .95)), COL.ink, 10, { arrow: true, dash: [26, 16] });
+    const k4 = P(700, 358); ring(k4[0], k4[1], 32, COL.ink, seg(lt, .5, .75) * .8, t);
+    tag(k4[0] - 60, k4[1] + 40, '#4', 'ISENBERG', COL.ink, seg(lt, .6, .85), { size: 30, esize: 17 });
+    tag(760, 640, 'KRIVTSOV KEEPS IT', 'TWO ON ONE · #4 ISENBERG THE DECOY · 8:07 OF THE 1ST', COL.ink, seg(lt, .8, 1.1));
+  }
+  if (id === 'g2go') { const G = TL.goals[1]; netPulse(t, G.t, ...P(1170, 345)); }
+  if (id === 'g9fz') {
+    const w = [P(593, 487), P(693, 410), P(740, 307)], p = [P(477, 360), P(873, 397)], net = P(350, 300);
+    spot(900, 600, 640, 330, eo(seg(lt, 0, .3)));
+    w.forEach((q, i) => ring(q[0], q[1], 34, COL.ink, seg(lt, .1 + i * .1, .4 + i * .1), t, { beam: i === 0 }));
+    p.forEach((q, i) => ring(q[0], q[1], 32, COL.def, seg(lt, .35 + i * .1, .6 + i * .1), t));
+    marker(wob(bez([w[0][0] - 10, w[0][1] - 10], [w[0][0] - 160, w[0][1] - 120], [net[0] + 30, net[1] + 30]), 2, 17), eo(seg(lt, .5, 1.0)), COL.ink, 10, { arrow: true, dash: [26, 16] });
+    tag(...[w[0][0] - 120, w[0][1] + 50], '#17', 'KRIVTSOV', COL.ink, seg(lt, .55, .8), { size: 30, esize: 17 });
+    tag(...[w[1][0] + 50, w[1][1] + 20], '#25', 'DRUMMOND', COL.ink, seg(lt, .6, .85), { size: 30, esize: 17 });
+    tag(1240, 420, 'THREE ON TWO', 'GO-AHEAD GOAL · 7:51 OF THE 2ND', COL.ink, seg(lt, .9, 1.2));
+  }
+  if (id === 'g9go') { const G = TL.goals[4]; netPulse(t, G.t, ...P(345, 300)); }
+  if (id === 'g10rfz') {
+    const t19 = P(205, 433), gk = P(720, 470);
+    spot(700, 640, 760, 300, eo(seg(lt, 0, .3)));
+    ring(t19[0], t19[1], 46, COL.ink, seg(lt, .1, .4), t, { beam: true });
+    ring(gk[0], gk[1], 52, COL.def, seg(lt, .3, .55), t);
+    tag(460, 760, 'TEPLY · #19', 'FROM MERRYMAN · 13:32 OF THE 2ND · 6–4', COL.ink, seg(lt, .6, .9));
+  }
+  // —— the deep breakdown: the 19:52.3 power-play goal ——
+  if (id === 'dfz1') {
+    const box = [P(440, 370), P(655, 350), P(795, 450), P(355, 445)];
+    spot(980, 680, 900, 330, eo(seg(lt, 0, .3)));
+    spacePatch(...P(575, 410), 190, 70, -0.05, seg(lt, .15, .5));
+    box.forEach((q, i) => ring(q[0], q[1], 30, COL.def, seg(lt, .3 + i * .08, .55 + i * .08), t));
+    marker(wob([...box, box[0]], 1.5, 19), eo(seg(lt, .55, 1.05)), COL.def, 5, { dash: [14, 10] });
+    const d25 = P(290, 535), d3 = P(995, 670);
+    ring(d25[0], d25[1], 40, COL.ink, seg(lt, .1, .4), t, { beam: true }); ring(d3[0], d3[1], 40, COL.ink, seg(lt, .2, .5), t);
+    tag(d25[0] - 240, d25[1] + 40, '#25 DRUMMOND', 'LOW, WITH THE PUCK', COL.ink, seg(lt, .7, .95), { size: 30, esize: 17 });
+    tag(d3[0] + 70, d3[1] - 40, '#3 KURTAS', 'UP TOP', COL.ink, seg(lt, .8, 1.05), { size: 30, esize: 17 });
+    tag(1180, 560, 'FIVE ON FOUR', 'THE BOX · THE SLOT INSIDE IT', COL.ink, seg(lt, 1.0, 1.3));
+  }
+  if (id === 'dslow1') {
+    const a = at('d25', src); ring(a[0], a[1], 40, COL.ink, 1 - seg(src, 277.6, 278.0), t, { beam: true });
+    if (src >= 278.0) { const b = at('d17', src); ring(b[0], b[1], 40, COL.ink, seg(src, 278.0, 278.5), t, { beam: true }); trail('d17', src, 278.0); }
+  }
+  if (id === 'dfz2') {   // the feed: the puck is in frame between #3 and #16
+    const k3 = P(967, 527), k16 = P(907, 337), k17 = P(593, 480), gk = P(433, 327), pk = P(930, 391);
+    spot(1100, 640, 720, 360, eo(seg(lt, 0, .3)));
+    ring(k3[0], k3[1], 40, COL.ink, seg(lt, .1, .4), t);
+    marker(wob([[k3[0] - 8, k3[1] - 30], pk, [k16[0] + 10, k16[1] + 6]], 1.5, 27), eo(seg(lt, .3, .75)), COL.ink, 9, { arrow: true });
+    X.save(); X.fillStyle = '#111'; X.strokeStyle = COL.ink; X.lineWidth = 4; X.beginPath(); X.ellipse(pk[0], pk[1], 13, 7, 0, 0, 7); X.fill(); X.stroke(); X.restore();
+    ring(k16[0], k16[1], 40, COL.ink, seg(lt, .55, .85), t, { beam: true });
+    ring(k17[0], k17[1], 38, COL.ink, seg(lt, .8, 1.05) * .75, t);
+    ring(gk[0], gk[1], 40, COL.def, seg(lt, .8, 1.05), t);
+    tag(k3[0] + 60, k3[1] + 10, '#3 KURTAS', 'UP TOP', COL.ink, seg(lt, .3, .55), { size: 30, esize: 17 });
+    tag(k16[0] + 60, k16[1] - 150, '#16 MORTSON', 'FAR CIRCLE', COL.ink, seg(lt, .75, 1.0), { size: 30, esize: 17 });
+    tag(160, 640, 'THE FEED', 'ACROSS TO THE FAR CIRCLE · THE PUCK IS IN FRAME', COL.ink, seg(lt, 1.0, 1.3));
+  }
+  if (id === 'dslow2' || id === 'dgo') {
+    const a = at('d16', src), fade = id === 'dgo' ? 1 - seg(src, 280.6, 281.0) : 1;
+    ring(a[0], a[1], 40, COL.ink, fade, t, { beam: true });
+    const b = at('d17', src); ring(b[0], b[1], 36, COL.ink, .6 * fade, t);
+  }
+  if (id === 'dfz3') {   // the one-timer, on one knee; #17 screens the goalie
+    const k16 = P(898, 336), k17 = P(596, 465), gk = P(440, 330), top = P(392, 300);
+    spot(1000, 560, 720, 300, eo(seg(lt, 0, .3)));
+    ring(k16[0], k16[1], 42, COL.ink, seg(lt, .05, .3), t, { beam: true });
+    marker(wob(bez([k16[0] - 30, k16[1] - 30], [900, 380], [top[0] + 20, top[1]]), 2, 29), eo(seg(lt, .25, .75)), COL.ink, 10, { arrow: true, dash: [26, 16] });
+    ring(gk[0], gk[1], 44, COL.def, seg(lt, .35, .6), t);
+    ring(k17[0], k17[1], 38, COL.ink, seg(lt, .5, .75), t);
+    marker(wob([[k17[0] - 10, k17[1] - 40], [gk[0] + 34, gk[1] - 10]], 2, 31), eo(seg(lt, .65, .95)), COL.ink, 5, { dash: [12, 10] });
+    tag(k17[0] - 120, k17[1] + 50, '#17 KRIVTSOV', 'SCREEN', COL.ink, seg(lt, .8, 1.05), { size: 30, esize: 17 });
+    tag(1180, 560, 'ONE-TIMER', '#16 MORTSON, ON ONE KNEE · HIGH TO THE NET', COL.ink, seg(lt, .9, 1.2));
+  }
+  if (id === 'dgo') { const n = at('dnet', 280.2); netPulse(t, s.t0 + (280.2 - s.s0) / (s.s1 - s.s0) * (s.t1 - s.t0), n[0], n[1]); }
+  if (id === 'dlive') { const n = at('dnet', 280.2); netPulse(t, TL.goals[7].t, n[0], n[1]); }
+}
+function trail(tr, src, s0) { const pts = []; for (let g = Math.max(s0, src - .6); g <= src; g += .03) pts.push(at(tr, g)); if (pts.length > 2) marker(pts, 1, COL.ink, 6, { dash: [14, 12] }); }
+
+// —— Rink homography (rink feet → source px of the 280.7 s frame; assets/rink.json) ——
+let RINK = null;
+function Hap(Hm, u, v) { const w = Hm[2][0] * u + Hm[2][1] * v + Hm[2][2]; return [(Hm[0][0] * u + Hm[0][1] * v + Hm[0][2]) / w * 1.5, (Hm[1][0] * u + Hm[1][1] * v + Hm[1][2]) / w * 1.5]; }
+function rinkLines(k, V = (u, v) => Hap(RINK.H, u, v), alpha = 1) {
+  // goal line + crease semicircle traced from the rink markings (dashed chalk)
+  X.save(); X.globalAlpha = alpha;
+  const gl = []; for (let i = 0; i <= 16; i++) gl.push(V(0, lerp(-24, 24, i / 16)));
+  marker(gl, eo(seg(k, 0, .6)), COL.chalk, 4, { dash: [18, 12] });
+  const cr = []; for (let i = 0; i <= 20; i++) { const a = -Math.PI / 2 + i / 20 * Math.PI; cr.push(V(6 * Math.cos(a), 6 * Math.sin(a))); }
+  marker(cr, eo(seg(k, .3, 1)), COL.chalk, 4);
+  X.restore();
+}
+// Top-down board: goal line at x 980, 12.5 px per foot, u to the right, v down (camera-side boards at the bottom)
+const BD = { gx: 1000, cy: 560, S: 12.5 };
+const B2 = (u, v) => [BD.gx + u * BD.S, BD.cy + v * BD.S];
+function drawTri(im, s0, s1, s2, d0, d1, d2) {
+  const den = (s1[0] - s0[0]) * (s2[1] - s0[1]) - (s2[0] - s0[0]) * (s1[1] - s0[1]); if (Math.abs(den) < 1e-6) return;
+  const cx = (d0[0] + d1[0] + d2[0]) / 3, cy = (d0[1] + d1[1] + d2[1]) / 3, g = p => { const dx = p[0] - cx, dy = p[1] - cy, l = Math.hypot(dx, dy) || 1; return [p[0] + dx / l * .8, p[1] + dy / l * .8]; };
+  const e0 = g(d0), e1 = g(d1), e2 = g(d2);
+  X.save(); X.beginPath(); X.moveTo(...e0); X.lineTo(...e1); X.lineTo(...e2); X.closePath(); X.clip();
+  const a = ((d1[0] - d0[0]) * (s2[1] - s0[1]) - (d2[0] - d0[0]) * (s1[1] - s0[1])) / den, b = ((d2[0] - d0[0]) * (s1[0] - s0[0]) - (d1[0] - d0[0]) * (s2[0] - s0[0])) / den;
+  const c = ((d1[1] - d0[1]) * (s2[1] - s0[1]) - (d2[1] - d0[1]) * (s1[1] - s0[1])) / den, d = ((d2[1] - d0[1]) * (s1[0] - s0[0]) - (d1[1] - d0[1]) * (s2[0] - s0[0])) / den;
+  X.transform(a, c, b, d, d0[0] - a * s0[0] - b * s0[1], d0[1] - c * s0[0] - d * s0[1]);
+  X.drawImage(im, 0, 0, W, H); X.restore();
+}
+let MAPIMG = null;
+async function mapImage() {
+  // the 280.7 s frame with the broadcaster's score graphic painted out (the flatten would drag it into the picture)
+  if (MAPIMG) return MAPIMG;
+  const im = await img(fsrc(280.7)); if (!im) return null;
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  x.drawImage(im, 0, 0, W, H); x.fillStyle = '#0d1418'; x.fillRect(270, 74, 1380, 130);
+  MAPIMG = c; return c;
+}
+// players at the goal (280.7 s): rink feet from the homography (tools/homography.py, research notes); u out from the goal line, v across
+const MAP_PL = [
+  { id: '16', team: 'u', uv: [16.1, -29.7] }, { id: '17', team: 'u', uv: [20.1, 3.2] }, { id: '25', team: 'u', uv: [31.8, 34.1] }, { id: '3', team: 'u', uv: [46.9, -6.2] }, { id: '', team: 'u', uv: [4.4, -6.9] },
+  { id: 'G', team: 'p', uv: [0.1, -8.0] }, { id: '', team: 'p', uv: [2.5, -2.8] }, { id: '', team: 'p', uv: [7.0, -14.4] }, { id: '', team: 'p', uv: [19.5, 10.7] }, { id: '18', team: 'p', uv: [32.4, -1.5] }];
+async function shotMap(s, t) {
+  const lt = t - s.t0, Hm = RINK.H;
+  const wk = eio(seg(lt, .55, 1.6));
+  const V = (u, v) => { const a = Hap(Hm, u, v), b = B2(u, v); return [lerp(a[0], b[0], wk), lerp(a[1], b[1], wk)]; };
+  X.fillStyle = COL.board; X.fillRect(0, 0, W, H); grid(wk);
+  const im = await mapImage();
+  const ia = 1 - seg(wk, .6, 1);
+  if (im && ia > 0) {
+    const punch = lerp(1.035, 1.0, eo(seg(lt, 0, .35)));
+    const fa = 1 - seg(wk, 0, .12);
+    if (fa > 0) { X.save(); X.globalAlpha = fa; await drawSrc(280.7, { zoom: punch }); grade({ freeze: 1 }); X.restore(); }
+    if (wk > 0) {
+      X.save(); X.globalAlpha = ia; X.filter = 'saturate(0.55) brightness(0.85)';
+      for (let u = -11; u < 50; u += 2) for (let v = -42; v < 42; v += 2) {
+        const c = [[u, v], [u + 2, v], [u + 2, v + 2], [u, v + 2]], si = c.map(p => Hap(Hm, p[0], p[1]));
+        if (si.every(p => p[0] < 0) || si.every(p => p[0] > W) || si.every(p => p[1] > H) || si.every(p => p[1] < 0)) continue;
+        const di = c.map(p => V(p[0], p[1]));
+        drawTri(im, si[0], si[1], si[2], di[0], di[1], di[2]); drawTri(im, si[0], si[2], si[3], di[0], di[2], di[3]);
+      }
+      X.restore();
+    }
+  }
+  // rink markings in rink feet (boards, goal line, crease, end-zone circles + dots)
+  const LK = seg(lt, .1, .8);
+  X.save();
+  const line = (pts, k, col = COL.chalk, w = 4, o = {}) => { const q = []; for (let j = 1; j < pts.length; j++) for (let r = 0; r <= 6; r++) q.push(V(lerp(pts[j - 1][0], pts[j][0], r / 6), lerp(pts[j - 1][1], pts[j][1], r / 6))); marker(q, k, col, w, o); };
+  line([[0, -40], [0, 40]], eo(seg(LK, 0, .5)), '#FF6B5E', 4);
+  line([[-11, -20], [-11, 20]], eo(seg(LK, .1, .6)));
+  const cr = []; for (let i = 0; i <= 20; i++) { const a = -Math.PI / 2 + i / 20 * Math.PI; cr.push([6 * Math.cos(a), 6 * Math.sin(a)]); } line(cr, eo(seg(LK, .2, .7)), COL.def, 4);
+  for (const sv of [-1, 1]) { const c = []; for (let i = 0; i <= 32; i++) { const a = i / 32 * Math.PI * 2; c.push([20 + 15 * Math.cos(a), sv * 22 + 15 * Math.sin(a)]); } line(c, eo(seg(LK, .3, .9)), '#FF6B5E', 3);
+    const d = V(20, sv * 22); X.fillStyle = '#FF6B5E'; X.beginPath(); X.arc(d[0], d[1], 6 * clamp(LK * 2), 0, 7); X.fill(); }
+  X.restore();
+  const gk = seg(wk, .7, 1); if (gk > 0) { const [gx, gy] = B2(-3.3, 0); X.save(); X.globalAlpha = gk; X.strokeStyle = COL.chalk; X.lineWidth = 4; X.strokeRect(gx, gy - 3 * BD.S, 3.3 * BD.S, 6 * BD.S); X.restore(); }
+  // players: dots land on the board as it settles (the scorer is already ringed from the frame)
+  MAP_PL.forEach((p, i) => {
+    const hero = p.id === '16', k = hero ? 1 : eo(seg(lt, 1.6 + i * .06, 1.85 + i * .06)); if (k <= 0) return;
+    const [px, py] = hero ? V(...p.uv) : B2(...p.uv), r = hero ? 22 : 16, col = p.team === 'u' ? COL.ink : COL.def;
+    X.save(); X.globalAlpha = k; X.fillStyle = col; X.shadowColor = col; X.shadowBlur = 16;
+    if (p.id === 'G') X.fillRect(px - r * k, py - r * k, 2 * r * k, 2 * r * k); else { X.beginPath(); X.ellipse(px, py, r * (hero ? 1 : k), r * (hero ? lerp(.36, 1, wk) : k), 0, 0, 7); X.fill(); }
+    X.shadowBlur = 0; X.fillStyle = '#0B0F14'; X.font = `800 italic ${hero ? 24 : 18}px ${F_C}`; X.textAlign = 'center'; X.textBaseline = 'middle';
+    if (wk > .9 && p.id) X.fillText(p.id, px, py + 1);
+    X.restore();
+  });
+  // measured distances: #16 and #17 to the centre of the goal line
+  const o = B2(0, 0);
+  { const p = B2(...MAP_PL[0].uv); marker([p, o], eo(seg(lt, 2.0, 2.5)), COL.ink, 7, { arrow: true }); const q = B2(...MAP_PL[1].uv); marker([o, q], eo(seg(lt, 2.35, 2.7)), COL.ink, 4, { dash: [14, 10] }); }
+  // left column
+  const L0 = 110;
+  X.save(); X.textBaseline = 'alphabetic';
+  const ta = eo(seg(lt, 1.3, 1.6));
+  X.globalAlpha = ta; X.fillStyle = COL.ink; X.fillRect(L0, 150, 10, 112);
+  X.fillStyle = '#fff'; X.font = `900 58px ${F_S}`; X.fillText('AT THE GOAL', L0 + 34, 214);
+  X.fillStyle = COL.ink; X.font = `600 22px ${F_C}`; X.letterSpacing = '5px'; X.fillText('TOP DOWN · JUST AFTER THE SHOT', L0 + 36, 254); X.letterSpacing = '0px';
+  const dist = i => Math.round(Math.hypot(...MAP_PL[i].uv));
+  const rows = [
+    { big: '#16 Mortson', small: 'FAR CIRCLE · ONE-TIMER', val: '≈' + dist(0) + ' ft', tt: 2.0, hi: true },
+    { big: '#17 Krivtsov', small: 'THE SLOT · SCREEN', val: '≈' + dist(1) + ' ft', tt: 2.35 },
+    { big: 'Goalie', small: 'DOWN ON THE SHOT', val: 'DOWN', tt: 2.7 }];
+  rows.forEach((r, i) => {
+    const y = 390 + i * 150, a = eo(seg(lt, r.tt, r.tt + .3)); if (a <= 0) return;
+    X.globalAlpha = a;
+    if (i > 0) { X.fillStyle = 'rgba(244,241,232,0.12)'; X.fillRect(L0, y - 104, 720 * a, 1); }
+    X.fillStyle = '#fff'; X.font = `700 40px ${F_S}`; X.fillText(r.big, L0, y - 14);
+    X.fillStyle = 'rgba(244,241,232,0.55)'; X.font = `600 21px ${F_C}`; X.letterSpacing = '3px'; X.fillText(r.small, L0 + 2, y + 22); X.letterSpacing = '0px';
+    X.textAlign = 'right'; X.fillStyle = r.hi ? COL.ink : i === 2 ? COL.def : '#fff'; X.font = `800 italic 64px ${F_C}`; X.fillText(r.val, L0 + 740, y + 4); X.textAlign = 'left';
+  });
+  X.globalAlpha = eo(seg(lt, 3.0, 3.3)); X.fillStyle = 'rgba(244,241,232,0.45)'; X.fillRect(L0, 836, 4, 26);
+  X.fillStyle = 'rgba(244,241,232,0.6)'; X.font = `500 22px ${F_S}`; X.fillText('Feet from the centre of the goal line, mapped from the rink markings', L0 + 18, 858);
+  X.fillText('in this one frame; about ±2 ft.', L0 + 18, 890);
+  X.restore();
+  strip(t, 'ana', s, 280.7, 1 - seg(lt, .5, .8));
+  flash(t, s.t0, .1, .55);
+}
+
+// —— Split screen: wide camera ‖ ice-level replay, both reaching the goal on the same beat ——
+const SPL = [{ cx0: 480, lab: ['A  HIGH SIDE', 'BROADCAST CAMERA'] }, { cx0: 330, lab: ['B  ICE LEVEL', 'REPLAY CAMERA'] }];
+async function splitView(s, t) {
+  const lt = t - s.t0, fz = s.kind === 'splitfz', open = S('dsplit');
+  const k = seg(t, open.t0, open.t0 + .32), kk = seg(t, s.t0, s.t1);
+  const fa = fz ? s.s0 : lerp(s.s0, s.s1, kk), fb = fz ? s.r0 : lerp(s.r0, s.r1, kk);
+  X.fillStyle = COL.board; X.fillRect(0, 0, W, H);
+  for (let side = 0; side < 2; side++) {
+    const P0 = SPL[side], px = side * 960, cx = P0.cx0 + 480;
+    const off = side ? lerp(520, 0, eo(k)) : lerp(-520, 0, eo(k));
+    const punch = fz ? lerp(1.035, 1.0, eo(seg(lt, 0, .35))) + .012 * seg(lt, 0, s.t1 - s.t0) : 1;
+    X.save(); X.beginPath(); X.rect(px, 0, 960, H); X.clip();
+    X.translate(px + off - P0.cx0, 0);
+    X.beginPath(); X.rect(P0.cx0, 0, 960, H); X.clip();
+    await drawSrc(side ? fb : fa, { zoom: punch, cx, cy: 540 });
+    grade({ freeze: fz ? eo(seg(lt, 0, .25)) : 0 });
+    X.translate(cx, 540); X.scale(punch, punch); X.translate(-cx, -540);
+    if (fz) {
+      if (side === 0) { const p = at('d16', 280.3), n = at('dnet', 280.3); spot((p[0] + n[0]) / 2, p[1] + 20, 420, 200, eo(seg(lt, 0, .3))); ring(p[0], p[1], 40, COL.ink, seg(lt, .15, .45), t, { beam: true }); marker(wob([[p[0] - 30, p[1] - 30], [n[0] + 30, n[1] - 40]], 2, 33), eo(seg(lt, .3, .7)), COL.ink, 8, { arrow: true, dash: [22, 14] }); }
+      else { const n = P(415, 405); spot(n[0] + 60, n[1], 330, 230, eo(seg(lt, 0, .3))); spacePatch(n[0] + 40, n[1] + 10, 130, 40, 0, seg(lt, .15, .5)); }
+    }
+    X.restore();
+    X.save(); X.globalAlpha = eo(seg(t, open.t0 + .15, open.t0 + .4));
+    const lx = px + 40, ly = 230; X.fillStyle = 'rgba(8,12,14,0.86)'; X.fillRect(lx, ly, 340, 72); X.fillStyle = side ? COL.def : COL.ink; X.fillRect(lx, ly, 6, 72);
+    X.fillStyle = '#fff'; X.font = `700 30px ${F_S}`; X.textBaseline = 'top'; X.fillText(P0.lab[0], lx + 22, ly + 8);
+    X.fillStyle = 'rgba(255,255,255,0.6)'; X.font = `600 18px ${F_C}`; X.letterSpacing = '3px'; X.fillText(P0.lab[1], lx + 24, ly + 46);
+    X.restore();
+  }
+  X.fillStyle = '#0B0F14'; X.fillRect(954, 0, 12, H * eo(k)); X.fillStyle = COL.ink; X.fillRect(957, 0, 6, H * eo(k));
+  X.fillStyle = COL.solid; X.fillRect(0, STRIP.y, W, STRIP.h1 + STRIP.h2);   // window A carries the broadcaster's score graphic: the band runs full width here
+  strip(t, fz ? 'ana' : 'rep', s, fa, 1);
+  if (fz) { flash(t, s.t0, .1, .55); tag(60, 720, '#16 MORTSON', 'SHOT FROM THE FAR CIRCLE', COL.ink, seg(lt, .45, .7), { size: 30, esize: 17 }); tag(1020, 720, 'IN', 'THE CREASE, FROM ICE LEVEL', COL.space, seg(lt, .6, .85), { size: 30, esize: 17 }); }
+}
+
+// —— End slate + card ——
+async function endPlate(t) {
+  const E = S('end'), Cd = S('card'), z = lerp(1.0, 1.04, seg(t, E.t0, Cd.t1));
+  await drawSrc(lerp(297.5, 300.5, seg(t, E.t0, Cd.t1)), { zoom: z, cx: 1300, cy: 600 }); grade({});
+}
+async function endSlate(t) {
+  const s = S('end'), T0 = s.t0;
+  await endPlate(t);
+  const g = X.createLinearGradient(0, 0, W, 0); g.addColorStop(0, 'rgba(6,10,12,0.95)'); g.addColorStop(.55, 'rgba(6,10,12,0.72)'); g.addColorStop(1, 'rgba(6,10,12,0.05)'); X.fillStyle = g; X.fillRect(0, 0, W, H);
+  const a = eo(seg(t, T0 + .05, T0 + .4));
+  X.save(); X.globalAlpha = a; X.textBaseline = 'alphabetic';
+  X.fillStyle = COL.ink; X.font = `800 italic 240px ${F_C}`; X.fillText('19:52.3', 110 + lerp(-60, 0, a), 470);
+  X.fillStyle = '#fff'; X.font = `900 72px ${F_S}`; X.fillText('#16 Jack Mortson', 120, 580);
+  X.fillStyle = 'rgba(255,255,255,0.85)'; X.font = `500 34px ${F_S}`; X.fillText('Power-play goal · assists Kurtas, Drummond', 122, 646);
+  X.fillStyle = 'rgba(255,255,255,0.55)'; X.font = `600 26px ${F_C}`; X.letterSpacing = '3px'; X.fillText('UMASS BOSTON 8 – 5 PLYMOUTH STATE · 6 FEB 2026', 122, 698);
+  X.restore();
+  const a2 = eo(seg(t, T0 + .6, T0 + .9));
+  X.save(); X.globalAlpha = a2; X.fillStyle = 'rgba(255,255,255,0.78)'; X.font = `500 28px ${F_S}`; X.fillText('Head coach Peter Belisle’s 500th game, per UMass Boston Athletics', 122, 790); X.restore();
+  marker(wob([[118, 498], [880, 490]], 2, 31), seg(t, T0 + .4, T0 + .75), COL.ink, 12);
+  strip(t, 'ana', null, 0, 1);
+}
+const CREDITS = [
+  'Footage: UMass Boston Athletics (YouTube “UMassBeacons”), “UMass Boston vs Plymouth State: Men’s Ice Hockey Highlights”, CC BY 3.0',
+  '   cut, reversed, slowed and frozen, colour-graded, graphics added; the broadcast score graphic is covered',
+  'Facts: Plymouth State Athletics box score and recap · Voice: ElevenLabs “Stephen Courson” via AI33',
+  'Drums: “MuldjordKit” by Lars Muldjord, FreePats version, CC BY 4.0 · other samples CC0 (FreePats, VSCO 2 CE, VCSL)',
+  'Unofficial fan analysis, not made or endorsed by UMass Boston, Plymouth State, the conference or the NCAA'];
+async function endCard(t) {
+  const s = S('card'), T0 = s.t0, out = seg(t, s.t1 - .3, s.t1);
+  await endPlate(t);
+  const g = X.createLinearGradient(0, 0, W, 0); g.addColorStop(0, 'rgba(6,10,12,0.96)'); g.addColorStop(.62, 'rgba(6,10,12,0.86)'); g.addColorStop(1, 'rgba(6,10,12,0.35)'); X.fillStyle = g; X.fillRect(0, 0, W, H);
+  strip(t, 'ana', null, 0, 1);
+  const x0 = 122, A = (d0, d1) => eo(seg(t, T0 + d0, T0 + d1)) * (1 - out);
+  X.save(); X.textBaseline = 'alphabetic';
+  const a1 = A(.1, .32); X.globalAlpha = a1; X.fillStyle = '#fff'; X.font = `800 italic 170px ${F_C}`; X.letterSpacing = '4px'; X.fillText('THE SLOT', x0 - 6 + lerp(-30, 0, a1), 430);
+  const a2 = A(.16, .38); X.globalAlpha = a2; X.fillStyle = COL.ink; X.font = `800 italic 64px ${F_C}`; X.letterSpacing = '3px'; X.fillText('Bookends', x0, 506);
+  const a3 = A(.24, .46); X.globalAlpha = a3 * .8; X.fillStyle = COL.chalk; X.fillRect(x0, 540, 640 * a3, 2);
+  X.globalAlpha = a3; X.fillStyle = 'rgba(255,255,255,0.92)'; X.font = `600 30px ${F_C}`; X.letterSpacing = '4px'; X.fillText('SPORTS TELESTRATOR · SAMPLE', x0, 598);
+  const a4 = A(.3, .52); X.globalAlpha = a4; X.letterSpacing = '0px'; X.font = `500 22px ${F_S}`; X.fillStyle = 'rgba(255,255,255,0.78)';
+  CREDITS.forEach((c, i) => { X.fillText(c, x0, 780 + i * 34); const w = X.measureText(c).width; if (x0 + w > 1840) console.warn('credit line too wide:', i, Math.round(w)); });
+  X.restore();
+  if (out > 0) { X.fillStyle = `rgba(0,0,0,${eio(out)})`; X.fillRect(0, 0, W, H); }
+}
+
+// —— Main render ——
+async function render(t) {
+  const s = segAt(t), lt = t - s.t0;
+  X.setTransform(1, 0, 0, 1, 0, 0); X.globalAlpha = 1; X.filter = 'none'; X.textAlign = 'left'; X.letterSpacing = '0px';
+  if (s.id === 'sting') sting(t);
+  else if (s.id === 'record') await record(t);
+  else if (s.id === 'turn') turn(t);
+  else if (s.id === 'data') dataCard(t);
+  else if (s.kind === 'end') await endSlate(t);
+  else if (s.kind === 'card') await endCard(t);
+  else if (s.kind === 'map') await shotMap(s, t);
+  else if (s.kind === 'split' || s.kind === 'splitfz') await splitView(s, t);
+  else {
+    const src = srcAt(s, t), fz = s.kind === 'fz';
+    const punch = fz ? lerp(1.035, 1.0, eo(seg(lt, 0, .35))) + .012 * seg(lt, 0, s.t1 - s.t0) : 1;
+    const jx = s.kind === 'rew' ? (hash(Math.floor(t * 30)) - .5) * 26 : 0;
+    await drawSrc(src, { zoom: punch, jx });
+    if (s.kind === 'rew') rewindFx(t);
+    grade({ freeze: fz ? eo(seg(lt, 0, .25)) : 0 });
+    X.save(); X.translate(W / 2, H / 2); X.scale(punch, punch); X.translate(-W / 2, -H / 2);
+    if (DBG) dbgMarks(src); else overlay(s, t, src);
+    X.restore();
+    const mode = s.kind === 'live' ? 'live' : (s.kind === 'rep' || s.rep) ? 'rep' : 'ana';
+    strip(t, mode, s, src, 1);   // in every footage frame from frame 1: it covers the broadcaster's score graphic
+    if (s.kind !== 'live') clockTag(src, fz ? 'freeze' : s.kind === 'rew' ? 'rew' : 'slow');
+    if (s.watch) { const v = arena(src), stopped = src >= 281.5; stopwatch(60, 230, 'ARENA CLOCK', v.toFixed(1), 1, stopped || fz); }
+    if (s.clock === 'g1' && s.id === 'g1go') { const k = seg(t, TL.goals[0].t + .4, TL.goals[0].t + .8);   // circle the game clock on the strip: 19:50
+      const c = []; for (let i = 0; i <= 36; i++) { const u = i / 36 * Math.PI * 2.1 - 2.2; c.push([STRIP.x + 1135 + Math.cos(u) * 120, STRIP.y + 42 + Math.sin(u) * 40]); } marker(wob(c, 2, 41), k, COL.space, 6);
+      tag(STRIP.x + 1000, 230, '0:10 ELAPSED', 'OFFICIAL TIME OF THE GOAL', COL.ink, seg(t, TL.goals[0].t + .7, TL.goals[0].t + 1.0), { size: 34, esize: 18 }); }
+    if (fz) flash(t, s.t0, .1, .55);
+  }
+  subtitle(t);
+  for (const id of ['record', 'g1live', 'g2live', 'turn', 'g9live', 'g10live', 'g12', 'dlive', 'map', 'data', 'end', 'card']) wipe(t, S(id).t0);
+}
+// Reading-time check (core/render/readcheck.mjs): the information the viewer must read
+window.TEXTS = t => {
+  const out = [], s = segAt(t), lt = t - s.t0, R = (id, text, x0, y0, x1, y1) => out.push({ id, text, x0, y0, x1, y1 });
+  if (s.id === 'record') { if (lt > .4) R('rec', 'MATCH RECORD', 120, 140, 700, 240); if (lt > 2.6) R('score', 'PLYMOUTH STATE 5 – 8 UMASS BOSTON', 120, 380, 1400, 520); if (lt > 3.35) R('ends', '0:10  39:52', 110, 690, 1600, 800); }
+  if (s.id === 'turn') { if (lt > .4) R('tt', 'THEN IT TURNED', 150, 110, 760, 250); if (lt > 3.6) R('rows', "18:44 O'Connell 5:36 Pray 5:51 Doyle", 150, 290, 1100, 720); if (lt > 5.0) R('15', '15 SECONDS APART', 480, 640, 1200, 760); }
+  if (s.id === 'data') [['First goal 0:10', .3], ['Last goal 7.7 s', .6], ['Goals / shots 8 / 38', .9], ['Saves 41', 1.2]].forEach(([txt, d], i) => { if (lt > d + .55) R('d' + i, txt, 150, 280 + i * 135, 1300, 400 + i * 135); });
+  if (s.id === 'map') { if (lt > 1.6) R('mt', 'AT THE GOAL', 110, 150, 700, 262); [['#16 Mortson ≈34 ft', 2.0], ['#17 Krivtsov ≈20 ft', 2.35], ['Goalie DOWN', 2.7]].forEach(([txt, d], i) => { if (lt > d + .3) R('m' + i, txt, 110, 300 + i * 150, 860, 420 + i * 150); }); }
+  if (s.id === 'dsplit' || s.id === 'dsplitfz') { if (t - S('dsplit').t0 > .4) { R('camA', 'A HIGH SIDE', 40, 230, 380, 302); R('camB', 'B ICE LEVEL', 1000, 230, 1340, 302); } }
+  if (s.id === 'end' && lt > .4) R('e1', '19:52.3 #16 Jack Mortson', 110, 260, 1000, 600);
+  if (s.id === 'card' && lt > .55 && t < s.t1 - .3) { R('cT', 'THE SLOT', 116, 280, 900, 440); R('cS', 'Bookends · SPORTS TELESTRATOR · SAMPLE', 122, 450, 800, 610); }
+  return out;
+};
+function dbgMarks(src) {
+  X.save(); X.font = '20px Mono'; X.fillStyle = '#f0f';
+  for (const tr of Object.keys(TRK)) { const k = TRK[tr]; if (src < k[0][0] - .05 || src > k[k.length - 1][0] + .05) continue; const [x, y] = at(tr, src); X.beginPath(); X.arc(x, y, 7, 0, 7); X.fill(); X.fillText(tr, x + 10, y - 10); }
+  if (RINK && Math.abs(src - 280.7) < .02) rinkLines(1);
+  X.fillStyle = '#ff0'; X.fillText('src ' + src.toFixed(3), 900, 260); X.restore();
+}
+
+(async () => {
+  TL = await (await fetch('timeline.json')).json();
+  CLIPS = Object.entries(TL.clips);
+  try { TL.vdur = await (await fetch('audio/vo/dur.json')).json(); } catch (e) { TL.vdur = {}; }
+  RINK = await (await fetch('assets/rink.json')).json();
+  window.DUR = TL.dur;
+  await Promise.all([`900 40px ${F_S}`, `500 20px ${F_S}`, `700 40px ${F_S}`, `800 italic 40px ${F_C}`, `600 20px ${F_C}`, `500 20px ${F_M}`].map(f => document.fonts.load(f, 'THE SLOT 0:10')));
+  await render(0);
+  window.render = render;
+  window.READY = true;
+})();
+</script></body></html>

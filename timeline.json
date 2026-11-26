@@ -1,0 +1,484 @@
+{
+ "dur": 129.8,
+ "fps": 30,
+ "src_fps": 60,
+ "clips": {
+  "c1": [
+   0.5,
+   13.6
+  ],
+  "c2": [
+   43.9,
+   50.0
+  ],
+  "c3": [
+   79.9,
+   83.5
+  ],
+  "c4": [
+   124.5,
+   128.3
+  ],
+  "c5": [
+   168.0,
+   172.8
+  ],
+  "c6": [
+   196.7,
+   201.7
+  ],
+  "c7": [
+   222.9,
+   225.2
+  ],
+  "c8": [
+   237.9,
+   243.7
+  ],
+  "c9": [
+   275.8,
+   284.8
+  ],
+  "c10": [
+   297.4,
+   300.6
+  ],
+  "c11": [
+   304.5,
+   305.7
+  ]
+ },
+ "seg": [
+  {
+   "id": "sting",
+   "t0": 0.0,
+   "t1": 2.0,
+   "kind": "board",
+   "s0": null,
+   "s1": null
+  },
+  {
+   "id": "record",
+   "t0": 2.0,
+   "t1": 10.0,
+   "kind": "board",
+   "s0": 0.6,
+   "s1": 0.6
+  },
+  {
+   "id": "g1live",
+   "t0": 10.0,
+   "t1": 19.4,
+   "kind": "live",
+   "s0": 0.6,
+   "s1": 10.0,
+   "clock": "g1"
+  },
+  {
+   "id": "g1fz",
+   "t0": 19.4,
+   "t1": 21.8,
+   "kind": "fz",
+   "s0": 10.0,
+   "s1": 10.0,
+   "clock": "g1"
+  },
+  {
+   "id": "g1go",
+   "t0": 21.8,
+   "t1": 25.2,
+   "kind": "live",
+   "s0": 10.0,
+   "s1": 13.4,
+   "clock": "g1"
+  },
+  {
+   "id": "g2live",
+   "t0": 25.2,
+   "t1": 28.6,
+   "kind": "live",
+   "s0": 44.0,
+   "s1": 47.4
+  },
+  {
+   "id": "g2fz",
+   "t0": 28.6,
+   "t1": 30.8,
+   "kind": "fz",
+   "s0": 47.4,
+   "s1": 47.4
+  },
+  {
+   "id": "g2go",
+   "t0": 30.8,
+   "t1": 33.2,
+   "kind": "live",
+   "s0": 47.4,
+   "s1": 49.8
+  },
+  {
+   "id": "g3",
+   "t0": 33.2,
+   "t1": 36.6,
+   "kind": "live",
+   "s0": 80.0,
+   "s1": 83.4
+  },
+  {
+   "id": "g4",
+   "t0": 36.6,
+   "t1": 40.2,
+   "kind": "live",
+   "s0": 124.6,
+   "s1": 128.2
+  },
+  {
+   "id": "turn",
+   "t0": 40.2,
+   "t1": 50.2,
+   "kind": "board",
+   "s0": null,
+   "s1": null
+  },
+  {
+   "id": "g9live",
+   "t0": 50.2,
+   "t1": 52.4,
+   "kind": "live",
+   "s0": 168.1,
+   "s1": 170.3
+  },
+  {
+   "id": "g9fz",
+   "t0": 52.4,
+   "t1": 54.6,
+   "kind": "fz",
+   "s0": 170.3,
+   "s1": 170.3
+  },
+  {
+   "id": "g9go",
+   "t0": 54.6,
+   "t1": 57.0,
+   "kind": "live",
+   "s0": 170.3,
+   "s1": 172.7
+  },
+  {
+   "id": "g10live",
+   "t0": 57.0,
+   "t1": 61.8,
+   "kind": "live",
+   "s0": 196.8,
+   "s1": 201.6
+  },
+  {
+   "id": "g10rep",
+   "t0": 61.8,
+   "t1": 63.8,
+   "kind": "rep",
+   "s0": 223.0,
+   "s1": 225.0
+  },
+  {
+   "id": "g10rfz",
+   "t0": 63.8,
+   "t1": 65.8,
+   "kind": "fz",
+   "s0": 225.0,
+   "s1": 225.0,
+   "rep": true
+  },
+  {
+   "id": "g12",
+   "t0": 65.8,
+   "t1": 71.4,
+   "kind": "live",
+   "s0": 238.0,
+   "s1": 243.6,
+   "pp": true
+  },
+  {
+   "id": "dlive",
+   "t0": 71.4,
+   "t1": 80.2,
+   "kind": "live",
+   "s0": 275.9,
+   "s1": 284.7,
+   "pp": true,
+   "clock": "g13"
+  },
+  {
+   "id": "drew",
+   "t0": 80.2,
+   "t1": 80.8,
+   "kind": "rew",
+   "s0": 284.7,
+   "s1": 276.6,
+   "pp": true,
+   "clock": "g13"
+  },
+  {
+   "id": "dfz1",
+   "t0": 80.8,
+   "t1": 83.4,
+   "kind": "fz",
+   "s0": 276.6,
+   "s1": 276.6,
+   "pp": true,
+   "clock": "g13"
+  },
+  {
+   "id": "dslow1",
+   "t0": 83.4,
+   "t1": 87.0,
+   "kind": "slow",
+   "s0": 276.6,
+   "s1": 279.6,
+   "pp": true,
+   "clock": "g13"
+  },
+  {
+   "id": "dfz2",
+   "t0": 87.0,
+   "t1": 89.8,
+   "kind": "fz",
+   "s0": 279.6,
+   "s1": 279.6,
+   "pp": true,
+   "clock": "g13",
+   "watch": true
+  },
+  {
+   "id": "dslow2",
+   "t0": 89.8,
+   "t1": 91.0,
+   "kind": "slow",
+   "s0": 279.6,
+   "s1": 279.9,
+   "pp": true,
+   "clock": "g13",
+   "watch": true
+  },
+  {
+   "id": "dfz3",
+   "t0": 91.0,
+   "t1": 93.4,
+   "kind": "fz",
+   "s0": 279.9,
+   "s1": 279.9,
+   "pp": true,
+   "clock": "g13",
+   "watch": true
+  },
+  {
+   "id": "dgo",
+   "t0": 93.4,
+   "t1": 96.8,
+   "kind": "slow",
+   "s0": 279.9,
+   "s1": 281.9,
+   "pp": true,
+   "clock": "g13",
+   "watch": true
+  },
+  {
+   "id": "dsplit",
+   "t0": 96.8,
+   "t1": 99.0,
+   "kind": "split",
+   "s0": 279.3,
+   "s1": 280.3,
+   "r0": 304.6,
+   "r1": 305.6,
+   "pp": true
+  },
+  {
+   "id": "dsplitfz",
+   "t0": 99.0,
+   "t1": 101.4,
+   "kind": "splitfz",
+   "s0": 280.3,
+   "s1": 280.3,
+   "r0": 305.6,
+   "pp": true
+  },
+  {
+   "id": "map",
+   "t0": 101.4,
+   "t1": 111.4,
+   "kind": "map",
+   "s0": 280.7,
+   "s1": 280.7
+  },
+  {
+   "id": "data",
+   "t0": 111.4,
+   "t1": 119.4,
+   "kind": "board",
+   "s0": null,
+   "s1": null
+  },
+  {
+   "id": "end",
+   "t0": 119.4,
+   "t1": 123.8,
+   "kind": "end",
+   "s0": 297.5,
+   "s1": 300.5
+  },
+  {
+   "id": "card",
+   "t0": 123.8,
+   "t1": 129.8,
+   "kind": "card",
+   "s0": 300.5,
+   "s1": 300.6
+  }
+ ],
+ "goals": [
+  {
+   "umb": 1,
+   "psu": 0,
+   "t": 22.25,
+   "lab": "0:10 1ST",
+   "from": 10.0
+  },
+  {
+   "umb": 2,
+   "psu": 0,
+   "t": 31.8,
+   "lab": "8:07 1ST",
+   "from": 25.2
+  },
+  {
+   "umb": 3,
+   "psu": 1,
+   "t": 34.9,
+   "lab": "13:22 1ST",
+   "from": 33.2
+  },
+  {
+   "umb": 4,
+   "psu": 1,
+   "t": 38.9,
+   "lab": "16:33 1ST",
+   "from": 36.6
+  },
+  {
+   "umb": 5,
+   "psu": 4,
+   "t": 56.0,
+   "lab": "7:51 2ND",
+   "from": 50.2
+  },
+  {
+   "umb": 6,
+   "psu": 4,
+   "t": 59.5,
+   "lab": "13:32 2ND",
+   "from": 57.0
+  },
+  {
+   "umb": 7,
+   "psu": 5,
+   "t": 70.5,
+   "lab": "18:24 2ND",
+   "from": 65.8
+  },
+  {
+   "umb": 8,
+   "psu": 5,
+   "t": 75.7,
+   "lab": "19:52.3 2ND",
+   "from": 71.4
+  }
+ ],
+ "vo": [
+  {
+   "id": "v01",
+   "t": 2.6,
+   "text": "UMass Boston 8, Plymouth State 5. Two clocks tell this story."
+  },
+  {
+   "id": "v02",
+   "t": 10.6,
+   "text": "Puck drops. Start the clock."
+  },
+  {
+   "id": "v03",
+   "t": 19.55,
+   "text": "Three Beacons already on the crease."
+  },
+  {
+   "id": "v04",
+   "t": 23.25,
+   "text": "Jude Kurtas. Ten seconds in."
+  },
+  {
+   "id": "v05",
+   "t": 28.7,
+   "text": "Same pair, roles swapped. Krivtsov takes it to the net."
+  },
+  {
+   "id": "v06",
+   "t": 33.6,
+   "text": "Merryman. Then Repmann. 4–1 after the first."
+  },
+  {
+   "id": "v07",
+   "t": 41.2,
+   "text": "Then it turned. Plymouth State scores twice in 15 seconds. 4–4."
+  },
+  {
+   "id": "v08",
+   "t": 52.5,
+   "text": "Two minutes later, three on two. Krivtsov again."
+  },
+  {
+   "id": "v09",
+   "t": 59.8,
+   "text": "Teply, from Merryman. 6–4."
+  },
+  {
+   "id": "v11",
+   "t": 71.7,
+   "text": "One more power play. Thirteen seconds left in the second."
+  },
+  {
+   "id": "v12",
+   "t": 80.9,
+   "text": "Five on four. Drummond low, Kurtas up top."
+  },
+  {
+   "id": "v13",
+   "t": 87.1,
+   "text": "Kurtas, up top, finds Mortson at the far circle."
+  },
+  {
+   "id": "v15",
+   "t": 91.3,
+   "text": "One-timer, on one knee. And Krivtsov is right in the goalie's eyes."
+  },
+  {
+   "id": "v16",
+   "t": 97.3,
+   "text": "7.7 to spare."
+  },
+  {
+   "id": "v17",
+   "t": 103.2,
+   "text": "From above: Mortson 34 feet out. Krivtsov screening in the slot."
+  },
+  {
+   "id": "v18",
+   "t": 112.0,
+   "text": "10 seconds in. 7.7 left. 8 goals on 38 shots."
+  },
+  {
+   "id": "v19",
+   "t": 123.3,
+   "text": "And, the team says, the head coach's 500th game."
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+THE SLOT — "Bookends" (Sports Telestrator sample) · unofficial fan analysis
+
+Footage and broadcast sound
+  UMass Boston Athletics (YouTube channel "UMassBeacons", UC6n45jpi89E_Y2AcB3oG7Fg),
+  "UMass Boston vs Plymouth State: Men's Ice Hockey Highlights", https://www.youtube.com/watch?v=eLQLqgMSW2w
+  published 2026-02-06, licence field on the video page: Creative Commons Attribution licence (reuse allowed) = CC BY 3.0
+  https://creativecommons.org/licenses/by/3.0/ — checked 2026-11-26. Commentary is the broadcast's own.
+  Changes: cut, reversed, slowed, frozen, colour-graded, graphics drawn on top; the broadcast score graphic is covered.
+  Not made or endorsed by UMass Boston, Plymouth State, the Little East Conference or the NCAA.
+
+Facts
+  Plymouth State Athletics box score and recap (see FACTS.md); "500th game" from the video description above.
+
+Voice
+  ElevenLabs voice "Stephen Courson – Hockey Commentator", generated through AI33 Pro (api.ai33.pro) on the user's account.
+
+Music samples
+  Drums: "MuldjordKit" by Lars Muldjord (drumgizmo.org), FreePats version, CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
+  CC0: FreePats project (freepats.zenvoid.org), VS Chamber Orchestra: Community Edition and Versilian Community Sample Library (Versilian Studios)
+
+Fonts (SIL Open Font License, via Google Fonts)
+  Noto Sans, Barlow Condensed, IBM Plex Mono
+
+Tools
+  Lemo-Opuscar film library (github.com/lemomo-ai/lemo-opuscar), style "Sports Telestrator"; ffmpeg; faster-whisper (checks).

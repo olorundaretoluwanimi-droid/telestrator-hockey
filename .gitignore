@@ -1,0 +1,10 @@
+.venv/
+raw/umb_psu_video.mp4
+raw/umb_psu_audio.m4a
+assets/c*/
+audio/orig.wav
+audio/vo_raw/
+out/
+research/
+stills/
+voice-audition/
